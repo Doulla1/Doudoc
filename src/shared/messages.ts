@@ -4,7 +4,6 @@ export type ExplorerToHostMessage =
   | { type: 'explorer-ready' }
   | { type: 'explorer-search'; query: string }
   | { type: 'open-page'; relativePath: string }
-  | { type: 'toggle-theme' }
   | { type: 'refresh-docs' };
 
 export type PanelToHostMessage =

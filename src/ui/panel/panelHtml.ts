@@ -7,7 +7,7 @@ export function getPanelHtml(theme: ThemeMode): string {
     <div class="layout">
       <header class="shell-header">
         <div class="header-brand">
-          <button class="icon-button header-sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Hide sidebar"></button>
+          <button class="icon-button is-plain header-sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Hide sidebar"></button>
           <div class="brand-copy">
             <div class="brand-title">Documentation</div>
             <div class="brand-subtitle">Current page</div>

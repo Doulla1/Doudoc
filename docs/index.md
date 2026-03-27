@@ -43,4 +43,4 @@ Le panneau de droite doit suivre les sections visibles.
 
 ### Thème
 
-Le thème sombre est actif par défaut, avec un switch vers le thème clair.
+La `WebviewView` suit automatiquement le thème actif de VS Code. La `WebviewPanel` conserve sa bascule clair / sombre.

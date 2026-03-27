@@ -12,9 +12,6 @@ export function getExplorerHtml(theme: ThemeMode): string {
             <div class="brand-subtitle">Workspace docs</div>
           </div>
         </div>
-        <div class="toolbar-actions">
-          <button class="icon-button is-plain" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
-        </div>
       </header>
       <div class="search-wrap">
         <input id="search" class="search-input" type="search" placeholder="Search docs by title or content" />
@@ -33,7 +30,6 @@ export function getExplorerHtml(theme: ThemeMode): string {
     const metaEl = document.getElementById('meta');
     const warningsEl = document.getElementById('warnings');
     const searchEl = document.getElementById('search');
-    const themeToggleEl = document.getElementById('theme-toggle');
 
     function escapeHtml(value) {
       return value
@@ -97,28 +93,12 @@ export function getExplorerHtml(theme: ThemeMode): string {
       warningsEl.innerHTML = '<div class="warning-banner"><strong>' + state.warnings.length + ' documentation warning(s)</strong><ul>' + items + suffix + '</ul></div>';
     }
 
-    function renderThemeToggle() {
-      const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
-      const label = nextTheme === 'light' ? 'Switch to light theme' : 'Switch to dark theme';
-      const icon = nextTheme === 'light'
-        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5a.75.75 0 0 1 .75.75V7a.75.75 0 0 1-1.5 0V5.25A.75.75 0 0 1 12 4.5Zm0 11.5a.75.75 0 0 1 .75.75v1.75a.75.75 0 0 1-1.5 0v-1.75A.75.75 0 0 1 12 16Zm7.5-4.75a.75.75 0 0 1 0 1.5h-1.75a.75.75 0 0 1 0-1.5Zm-11.5 0a.75.75 0 0 1 0 1.5H6.25a.75.75 0 0 1 0-1.5Zm8.132-4.382a.75.75 0 0 1 1.06 0l1.238 1.238a.75.75 0 1 1-1.06 1.06l-1.238-1.237a.75.75 0 0 1 0-1.06Zm-10.562 10.56a.75.75 0 0 1 1.06 0l1.238 1.239a.75.75 0 1 1-1.06 1.06l-1.238-1.239a.75.75 0 0 1 0-1.06Zm0-9.5a.75.75 0 0 1 1.06 0L7.868 9.16a.75.75 0 1 1-1.06 1.06L5.57 8.985a.75.75 0 0 1 0-1.06Zm10.562 10.56a.75.75 0 0 1 1.06 0 .75.75 0 0 1 0 1.06l-1.238 1.239a.75.75 0 1 1-1.06-1.06l1.238-1.239ZM12 8.25A3.75 3.75 0 1 1 8.25 12 3.754 3.754 0 0 1 12 8.25Zm0 1.5A2.25 2.25 0 1 0 14.25 12 2.252 2.252 0 0 0 12 9.75Z"/></svg>'
-        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.222 3.442a.75.75 0 0 1 .748.879 7.5 7.5 0 0 0 9.707 8.774.75.75 0 0 1 .876.95A10.5 10.5 0 1 1 12.27 2.567a.75.75 0 0 1 .952.875Zm-.992 1.02a9 9 0 1 0 10.276 10.29A9.002 9.002 0 0 1 12.23 4.462Z"/></svg>';
-
-      themeToggleEl.innerHTML = icon;
-      themeToggleEl.title = label;
-      themeToggleEl.setAttribute('aria-label', label);
-    }
-
     function countFiles(nodes) {
       return nodes.reduce((total, node) => total + (node.type === 'file' ? 1 : countFiles(node.children || [])), 0);
     }
 
     searchEl.addEventListener('input', (event) => {
       vscode.postMessage({ type: 'explorer-search', query: event.target.value });
-    });
-
-    themeToggleEl.addEventListener('click', () => {
-      vscode.postMessage({ type: 'toggle-theme' });
     });
 
     window.addEventListener('message', (event) => {
@@ -130,7 +110,6 @@ export function getExplorerHtml(theme: ThemeMode): string {
       state = message;
       document.documentElement.dataset.theme = state.theme;
       searchEl.value = state.query;
-      renderThemeToggle();
       renderMeta();
       renderWarnings();
       renderTree(state.tree);
@@ -167,11 +146,6 @@ export function getExplorerHtml(theme: ThemeMode): string {
     }
     .brand-title { font-weight: 600; font-size: 14px; }
     .brand-subtitle { color: var(--text-muted); font-size: 11px; }
-    .toolbar-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
     .search-wrap {
       padding-top: 0;
     }

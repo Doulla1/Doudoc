@@ -14,7 +14,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   const repository = new DocsRepository(workspaceFolder.uri.fsPath);
-  let theme: ThemeMode = persistedTheme ?? 'light';
+  let panelTheme: ThemeMode = persistedTheme ?? 'light';
+  let explorerTheme: ThemeMode = getActiveTheme();
   let selectedPath: string | null = null;
   let explorerQuery = '';
   let panelQuery = '';
@@ -22,12 +23,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await repository.refresh();
   selectedPath = repository.getDefaultPagePath();
 
-  const explorerView = new ExplorerViewProvider(handleMessage, () => theme);
+  const explorerView = new ExplorerViewProvider(handleMessage, () => explorerTheme);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('doudoc.explorerView', explorerView));
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveColorTheme(() => {
+      explorerTheme = getActiveTheme();
+      void publishExplorerState();
+    }),
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('doudoc.openPanel', async () => {
-      const panel = DocsPanel.createOrReveal(context, handleMessage, () => theme);
+      const panel = DocsPanel.createOrReveal(context, handleMessage, () => panelTheme);
       await publishPanelState(panel);
       await publishCurrentPage(panel);
     }),
@@ -108,15 +115,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
         selectedPath = typedMessage.relativePath;
-        const panel = DocsPanel.createOrReveal(context, handleMessage, () => theme);
+        const panel = DocsPanel.createOrReveal(context, handleMessage, () => panelTheme);
         await publishExplorerState();
         await publishPanelState(panel);
         await publishCurrentPage(panel, typeof typedMessage.anchor === 'string' ? typedMessage.anchor : undefined);
         return;
       }
       case 'toggle-theme':
-        theme = theme === 'dark' ? 'light' : 'dark';
-        await context.globalState.update('doudoc.theme', theme);
+        panelTheme = panelTheme === 'dark' ? 'light' : 'dark';
+        await context.globalState.update('doudoc.theme', panelTheme);
         await publishAll();
         return;
       case 'refresh-docs':
@@ -140,9 +147,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   async function publishExplorerState(): Promise<void> {
     const snapshot = repository.getSnapshot();
+    explorerTheme = getActiveTheme();
     await explorerView.postMessage({
       type: 'explorer-state',
-      theme,
+      theme: explorerTheme,
       tree: repository.filterTree(explorerQuery),
       selectedPath,
       query: explorerQuery,
@@ -157,7 +165,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     await panel.postMessage({
       type: 'panel-state',
-      theme,
+      theme: panelTheme,
       tree: snapshot.tree,
       selectedPath,
       query: panelQuery,
@@ -198,4 +206,8 @@ export function deactivate(): void {}
 
 function createDocsWatcher(workspaceFolder: vscode.WorkspaceFolder): vscode.FileSystemWatcher {
   return vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(workspaceFolder, 'docs/**'));
+}
+
+function getActiveTheme(): ThemeMode {
+  return vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light ? 'light' : 'dark';
 }

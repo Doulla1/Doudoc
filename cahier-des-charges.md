@@ -60,6 +60,7 @@ Elle doit afficher :
 - les dossiers parents repliables / dépliables ;
 - les pages filtrées selon la recherche ;
 - un accès rapide à l'ouverture d'une page dans la `WebviewPanel`.
+- une adaptation automatique au thème actif de VS Code, sans switch local.
 
 ### 2.5 WebviewPanel
 

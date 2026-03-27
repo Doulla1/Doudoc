@@ -45,6 +45,9 @@ export function createBaseStyles(): string {
       --code-bg: #0f1520;
       --mark-bg: #ffdb6e;
       --mark-text: #291d00;
+      --scrollbar-track: #10161f;
+      --scrollbar-thumb: rgba(255,255,255,0.22);
+      --scrollbar-thumb-hover: rgba(255,255,255,0.34);
     }
     html[data-theme='light'] {
       color-scheme: light;
@@ -63,11 +66,36 @@ export function createBaseStyles(): string {
       --code-bg: #f4f5f7;
       --mark-bg: #fff4a3;
       --mark-text: #533d00;
+      --scrollbar-track: #f7f8fa;
+      --scrollbar-thumb: rgba(9, 30, 66, 0.22);
+      --scrollbar-thumb-hover: rgba(9, 30, 66, 0.34);
     }
 
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
     body { min-height: 100vh; line-height: 1.5; }
+    * {
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      scrollbar-width: thin;
+    }
+    *::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+    *::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    *::-webkit-scrollbar-thumb {
+      background-color: var(--scrollbar-thumb);
+      border: 3px solid var(--scrollbar-track);
+      border-radius: 999px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: var(--scrollbar-thumb-hover);
+    }
+    *::-webkit-scrollbar-corner {
+      background: var(--scrollbar-track);
+    }
     button, input {
       font: inherit;
     }
