@@ -54,6 +54,10 @@ export class DocsPanel {
     return this.panel.webview.postMessage(message);
   }
 
+  setTitle(title: string): void {
+    this.panel.title = title;
+  }
+
   reveal(): void {
     this.panel.reveal(vscode.ViewColumn.Active);
   }

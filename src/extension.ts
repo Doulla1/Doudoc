@@ -171,6 +171,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   async function publishCurrentPage(panel: DocsPanel, anchor?: string): Promise<void> {
     const pagePath = selectedPath ?? repository.getDefaultPagePath();
     const page = pagePath ? repository.getPage(pagePath, panel.getWebview()) : null;
+    panel.setTitle(page?.label ?? 'Doudoc');
     await panel.postMessage({
       type: 'panel-page',
       page,

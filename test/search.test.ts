@@ -23,6 +23,16 @@ const pages: DocPageRecord[] = [
     plainText: 'Methods, payloads and authentication details.',
     headings: [{ id: 'authentication', depth: 2, text: 'Authentication' }],
   },
+  {
+    id: 'file:cafe-guide.md',
+    label: 'Café Guide',
+    fileName: 'cafe-guide.md',
+    relativePath: 'cafe-guide.md',
+    absolutePath: '/tmp/cafe-guide.md',
+    rawMarkdown: '# Café Guide',
+    plainText: 'Déploiement et résumé des étapes.',
+    headings: [{ id: 'demarrage', depth: 2, text: 'Démarrage rapide' }],
+  },
 ];
 
 describe('searchPages', () => {
@@ -39,5 +49,11 @@ describe('searchPages', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.label).toBe('API Reference');
     expect(results[0]?.matchType).toBe('content');
+  });
+
+  it('matches accented text without requiring accents in the query', () => {
+    expect(searchPages(pages, 'cafe')[0]?.label).toBe('Café Guide');
+    expect(searchPages(pages, 'demarrage')[0]?.matchType).toBe('heading');
+    expect(searchPages(pages, 'deploiement')[0]?.matchType).toBe('content');
   });
 });

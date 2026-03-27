@@ -34,16 +34,7 @@ export function getPanelHtml(theme: ThemeMode): string {
         </aside>
         <main class="content-shell">
           <div class="page-toolbar">
-            <div class="page-toolbar-left">
-              <div id="page-title" class="page-title">Select a page</div>
-              <div id="page-search-meta" class="search-meta"></div>
-            </div>
-            <div class="page-toolbar-right">
-              <div class="page-search-actions">
-                <button class="icon-button" id="page-search-prev" title="Previous match">↑</button>
-                <button class="icon-button" id="page-search-next" title="Next match">↓</button>
-              </div>
-            </div>
+            <div id="page-search-meta" class="search-meta"></div>
           </div>
           <div id="page-warnings" class="page-warnings"></div>
           <section id="content" class="content"></section>
@@ -78,14 +69,11 @@ export function getPanelHtml(theme: ThemeMode): string {
     const shellBodyEl = document.getElementById('shell-body');
     const globalSearchEl = document.getElementById('global-search');
     const pageSearchEl = document.getElementById('page-search');
-    const pageTitleEl = document.getElementById('page-title');
     const pageSearchMetaEl = document.getElementById('page-search-meta');
     const scanWarningsEl = document.getElementById('scan-warnings');
     const pageWarningsEl = document.getElementById('page-warnings');
     const themeToggleEl = document.getElementById('theme-toggle');
     const sidebarToggleEl = document.getElementById('sidebar-toggle');
-    const pageSearchPrevEl = document.getElementById('page-search-prev');
-    const pageSearchNextEl = document.getElementById('page-search-next');
     let tocObserver = null;
 
     function escapeHtml(value) {
@@ -95,6 +83,30 @@ export function getPanelHtml(theme: ThemeMode): string {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
+    }
+
+    function foldSearchText(input) {
+      let folded = '';
+      const indexMap = [];
+      let cursor = 0;
+
+      for (const char of input) {
+        const normalized = char
+          .normalize('NFKD')
+          .replace(/[\\u0300-\\u036f]/g, '')
+          .toLowerCase();
+
+        if (normalized) {
+          for (const normalizedChar of normalized) {
+            folded += normalizedChar;
+            indexMap.push(cursor);
+          }
+        }
+
+        cursor += char.length;
+      }
+
+      return { folded, indexMap };
     }
 
     function renderNode(node) {
@@ -215,15 +227,12 @@ export function getPanelHtml(theme: ThemeMode): string {
       clearHighlights();
 
       if (!page) {
-        pageTitleEl.textContent = 'Select a page';
         pageWarningsEl.innerHTML = '';
         contentEl.innerHTML = '<div class="empty-state">Select a documentation page to begin.</div>';
         renderToc();
         updatePageSearchUi();
         return;
       }
-
-      pageTitleEl.textContent = page.label;
 
       if (page.warnings.length) {
         const items = page.warnings.map((warning) => '<li>' + escapeHtml(warning) + '</li>').join('');
@@ -279,7 +288,9 @@ export function getPanelHtml(theme: ThemeMode): string {
     function highlightInPage(query) {
       clearHighlights();
 
-      if (!query || !currentPage) {
+      const foldedQuery = foldSearchText(query).folded.trim();
+
+      if (!foldedQuery || !currentPage) {
         return;
       }
 
@@ -299,7 +310,6 @@ export function getPanelHtml(theme: ThemeMode): string {
         }
       });
 
-      const lowerQuery = query.toLowerCase();
       const textNodes = [];
       let node;
       while ((node = walker.nextNode())) {
@@ -308,31 +318,37 @@ export function getPanelHtml(theme: ThemeMode): string {
 
       textNodes.forEach((textNode) => {
         const text = textNode.textContent || '';
-        const lowerText = text.toLowerCase();
-        const index = lowerText.indexOf(lowerQuery);
-        if (index === -1) {
+        const foldedText = foldSearchText(text);
+
+        if (foldedText.folded.indexOf(foldedQuery) === -1) {
           return;
         }
 
         const fragment = document.createDocumentFragment();
         let cursor = 0;
-        while (cursor < text.length) {
-          const matchIndex = lowerText.indexOf(lowerQuery, cursor);
+        let originalCursor = 0;
+
+        while (cursor < foldedText.folded.length) {
+          const matchIndex = foldedText.folded.indexOf(foldedQuery, cursor);
           if (matchIndex === -1) {
-            fragment.appendChild(document.createTextNode(text.slice(cursor)));
+            fragment.appendChild(document.createTextNode(text.slice(originalCursor)));
             break;
           }
 
-          if (matchIndex > cursor) {
-            fragment.appendChild(document.createTextNode(text.slice(cursor, matchIndex)));
+          const originalStart = foldedText.indexMap[matchIndex] ?? 0;
+          const originalEnd = foldedText.indexMap[matchIndex + foldedQuery.length] ?? text.length;
+
+          if (originalStart > originalCursor) {
+            fragment.appendChild(document.createTextNode(text.slice(originalCursor, originalStart)));
           }
 
           const mark = document.createElement('mark');
           mark.className = 'doudoc-highlight';
-          mark.textContent = text.slice(matchIndex, matchIndex + query.length);
+          mark.textContent = text.slice(originalStart, originalEnd);
           currentHighlights.push(mark);
           fragment.appendChild(mark);
-          cursor = matchIndex + query.length;
+          originalCursor = originalEnd;
+          cursor = matchIndex + foldedQuery.length;
         }
 
         textNode.parentNode?.replaceChild(fragment, textNode);
@@ -357,9 +373,6 @@ export function getPanelHtml(theme: ThemeMode): string {
       } else {
         pageSearchMetaEl.textContent = (currentHighlightIndex + 1) + ' / ' + currentHighlights.length;
       }
-
-      pageSearchPrevEl.disabled = !hasHighlights;
-      pageSearchNextEl.disabled = !hasHighlights;
     }
 
     function focusCurrentHighlight() {
@@ -421,14 +434,6 @@ export function getPanelHtml(theme: ThemeMode): string {
         event.preventDefault();
         navigateHighlight(event.shiftKey ? -1 : 1);
       }
-    });
-
-    pageSearchPrevEl.addEventListener('click', () => {
-      navigateHighlight(-1);
-    });
-
-    pageSearchNextEl.addEventListener('click', () => {
-      navigateHighlight(1);
     });
 
     sidebarToggleEl.addEventListener('click', () => {
@@ -644,20 +649,11 @@ export function getPanelHtml(theme: ThemeMode): string {
       z-index: 2;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 12px;
-      padding: 12px 20px 8px;
+      padding: 8px 20px 4px;
       background: var(--bg);
       border-bottom: none;
-    }
-    .page-toolbar-left,
-    .page-toolbar-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .page-toolbar-right {
-      min-width: 0;
     }
     .page-search-input {
       min-width: 260px;
@@ -668,16 +664,6 @@ export function getPanelHtml(theme: ThemeMode): string {
     .sidebar-search-input {
       background: var(--bg-muted);
     }
-    .page-search-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .icon-button:disabled {
-      opacity: 0.45;
-      cursor: default;
-      transform: none;
-    }
     .content {
       min-height: 0;
       padding: 0 18px 28px;
@@ -686,14 +672,12 @@ export function getPanelHtml(theme: ThemeMode): string {
       width: 100%;
       max-width: none;
       margin: 0;
-      padding: 12px 0 72px;
+      padding: 4px 0 72px;
       line-height: 1.7;
       color: var(--text);
     }
-    .page-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
+    .doc-article > :first-child {
+      margin-top: 0;
     }
     .doc-article h1,
     .doc-article h2,
