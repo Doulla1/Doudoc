@@ -3,15 +3,15 @@
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
   "version": "1.0.0",
-  "publisher": "adiallo",
+  "publisher": "Doudou",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/adiallo/Doudoc.git"
+    "url": "https://github.com/Doulla1/Doudoc.git"
   },
-  "homepage": "https://github.com/adiallo/Doudoc#readme",
+  "homepage": "https://github.com/Doulla1/Doudoc#readme",
   "bugs": {
-    "url": "https://github.com/adiallo/Doudoc/issues"
+    "url": "https://github.com/Doulla1/Doudoc/issues"
   },
   "keywords": [
     "documentation",
