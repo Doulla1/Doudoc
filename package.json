@@ -2,17 +2,28 @@
   "name": "doudoc",
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "publisher": "adiallo",
-  "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/adiallo/Doudoc.git"
   },
+  "homepage": "https://github.com/adiallo/Doudoc#readme",
+  "bugs": {
+    "url": "https://github.com/adiallo/Doudoc/issues"
+  },
+  "keywords": [
+    "documentation",
+    "markdown",
+    "docs",
+    "knowledge-base",
+    "webview"
+  ],
   "files": [
     "dist/**",
     "media/**",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE.txt",
     "package.json"
@@ -23,6 +34,10 @@
   "categories": [
     "Other"
   ],
+  "galleryBanner": {
+    "color": "#101521",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onView:doudoc.explorerView",
     "onCommand:doudoc.openPanel",
@@ -77,11 +92,13 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run build",
     "build": "node ./scripts/esbuild.mjs",
     "watch": "node ./scripts/esbuild.mjs --watch",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "package": "npm run build"
+    "verify": "npm run check && npm test",
+    "package": "npx @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
     "markdown-it": "^14.1.0"

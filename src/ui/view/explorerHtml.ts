@@ -1,7 +1,7 @@
 import { createBaseStyles, createNonce, wrapHtmlDocument } from '@ui/shared/webviewHtml';
 import type { ThemeMode } from '@shared/types';
 
-export function getExplorerHtml(theme: ThemeMode): string {
+export function getExplorerHtml(theme: ThemeMode, cspSource: string): string {
   const nonce = createNonce();
   const body = `
     <div class="app">
@@ -196,5 +196,6 @@ export function getExplorerHtml(theme: ThemeMode): string {
     `<style>${styles}</style>${body}`,
     script,
     theme,
+    cspSource,
   );
 }

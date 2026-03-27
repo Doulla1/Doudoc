@@ -2,14 +2,21 @@ export function createNonce(): string {
   return Math.random().toString(36).slice(2, 15);
 }
 
-export function wrapHtmlDocument(title: string, nonce: string, body: string, script: string, theme: 'dark' | 'light'): string {
+export function wrapHtmlDocument(
+  title: string,
+  nonce: string,
+  body: string,
+  script: string,
+  theme: 'dark' | 'light',
+  cspSource: string,
+): string {
   return `<!DOCTYPE html>
 <html lang="en" data-theme="${theme}">
   <head>
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src data: https: vscode-webview-resource:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src https: data:;"
+      content="default-src 'none'; img-src ${cspSource} data: https:; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${cspSource} https: data:;"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title}</title>

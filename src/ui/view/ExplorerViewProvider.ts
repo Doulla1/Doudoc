@@ -16,7 +16,7 @@ export class ExplorerViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = {
       enableScripts: true,
     };
-    webviewView.webview.html = getExplorerHtml(this.getTheme());
+    webviewView.webview.html = getExplorerHtml(this.getTheme(), webviewView.webview.cspSource);
     webviewView.webview.onDidReceiveMessage((message) => this.onMessage(message));
   }
 

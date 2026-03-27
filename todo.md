@@ -102,9 +102,9 @@
 - [x] Ajouter des tests unitaires sur l'extraction des titres et headings
 - [x] Ajouter des tests sur la résolution des liens relatifs
 - [x] Ajouter des tests sur le scoring de recherche
-- [ ] Vérifier les comportements sur plusieurs structures `/docs`
+- [x] Vérifier les comportements sur plusieurs structures `/docs`
 - [ ] Vérifier le rendu de documents longs
-- [ ] Vérifier les recherches globales et dans la page
+- [x] Vérifier les recherches globales et dans la page
 - [ ] Vérifier la sécurité de la webview et la CSP
 
 ## Phase 11 - Finition

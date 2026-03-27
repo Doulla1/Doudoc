@@ -1,7 +1,7 @@
 import { createBaseStyles, createNonce, wrapHtmlDocument } from '@ui/shared/webviewHtml';
 import type { ThemeMode } from '@shared/types';
 
-export function getPanelHtml(theme: ThemeMode): string {
+export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
   const nonce = createNonce();
   const body = `
     <div class="layout">
@@ -795,5 +795,6 @@ export function getPanelHtml(theme: ThemeMode): string {
     `<style>${styles}</style>${body}`,
     script,
     theme,
+    cspSource,
   );
 }

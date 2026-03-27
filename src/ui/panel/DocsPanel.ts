@@ -23,7 +23,7 @@ export class DocsPanel {
       },
     );
 
-    this.panel.webview.html = getPanelHtml(this.getTheme());
+    this.panel.webview.html = getPanelHtml(this.getTheme(), this.panel.webview.cspSource);
     this.panel.webview.onDidReceiveMessage((message) => this.onMessage(message));
     this.panel.onDidDispose(() => {
       if (DocsPanel.current === this) {

@@ -1,56 +1,73 @@
 # Doudoc
 
-Doudoc est une extension VS Code qui lit la documentation présente dans `/<projectRoot>/docs` et l'affiche dans une interface moderne avec :
+Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/docs` and displays it in a modern interface with:
 
-- une `WebviewView` compacte dans l'activité bar ;
-- une `WebviewPanel` principale de lecture ;
-- une recherche globale sur titre + contenu ;
-- une recherche dans la page avec surbrillance ;
-- un sommaire cliquable ;
-- la prise en charge des liens relatifs Markdown et des images locales.
+- a compact `WebviewView` in the activity bar;
+- a main `WebviewPanel` for reading;
+- global search on title + content;
+- in-page search with highlighting;
+- a clickable table of contents;
+- support for Markdown relative links and local images.
 
-## Installation locale
+## Marketplace
 
-1. Générer le package :
+Doudoc is ready for initial publication `1.0.0` on the VS Code Marketplace.
+
+- license: `MIT`
+- repository: `https://github.com/Doulla1/Doudoc`
+- publisher: `adiallo`
+
+## Pre-publication
 
 ```bash
 npm install
-npm run build
-npx @vscode/vsce package -o doudoc-0.0.1.vsix
+npm run verify
+npm run package
 ```
 
-2. Dans VS Code :
+The `npm run package` command produces `doudoc-1.0.0.vsix` and automatically triggers the build via `vscode:prepublish`.
 
-- ouvrir `Extensions`
-- ouvrir le menu `...`
-- choisir `Install from VSIX...`
-- sélectionner `doudoc-0.0.1.vsix`
+## Local installation
 
-## Test rapide
+1. Generate the package:
 
-Le projet contient un dossier `docs/` de démonstration avec :
+```bash
+npm install
+npm run package
+```
 
-- une arborescence multi-niveaux ;
-- des liens relatifs entre pages ;
-- une image locale ;
-- des cas de fallback de label ;
-- des cas de warnings sur assets ou liens non résolus.
+2. In VS Code:
 
-Une fois l'extension installée :
+- open `Extensions`
+- open the `...` menu
+- select `Install from VSIX...`
+- select `doudoc-1.0.0.vsix`
 
-- ouvrir l'activité bar `Doudoc` ;
-- vérifier l'icône dédiée de l'Activity Bar ;
-- ouvrir des pages depuis la `WebviewView` ;
-- tester la recherche globale et la recherche dans la page ;
-- vérifier l'affichage des warnings non bloquants.
+## Quick test
 
-## Limites actuelles
+The project contains a demo `docs/` folder with:
 
-- l'édition WYSIWYG inline n'est pas encore implémentée ;
-- les warnings sont informatifs mais pas encore interactifs ;
-- le support des erreurs complexes de contenu Markdown reste volontairement minimal.
+- multi-level file tree;
+- relative links between pages;
+- a local image;
+- label fallback cases;
+- warning cases for unresolved assets or links.
 
-## Développement
+Once the extension is installed:
+
+- open the `Doudoc` activity bar;
+- verify the dedicated Activity Bar icon;
+- open pages from the `WebviewView`;
+- test global search and in-page search;
+- verify the display of non-blocking warnings.
+
+## Current limitations
+
+- inline WYSIWYG editing is not yet implemented;
+- warnings are informative but not yet interactive;
+- support for complex Markdown content errors remains intentionally minimal.
+
+## Development
 
 ```bash
 npm install
