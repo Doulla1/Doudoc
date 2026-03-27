@@ -9,14 +9,6 @@ Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/do
 - a clickable table of contents;
 - support for Markdown relative links and local images.
 
-## Marketplace
-
-Doudoc is ready for initial publication `1.0.0` on the VS Code Marketplace.
-
-- license: `MIT`
-- repository: `https://github.com/Doulla1/Doudoc`
-- publisher: `adiallo`
-
 ## Pre-publication
 
 ```bash
@@ -52,20 +44,6 @@ The project contains a demo `docs/` folder with:
 - a local image;
 - label fallback cases;
 - warning cases for unresolved assets or links.
-
-Once the extension is installed:
-
-- open the `Doudoc` activity bar;
-- verify the dedicated Activity Bar icon;
-- open pages from the `WebviewView`;
-- test global search and in-page search;
-- verify the display of non-blocking warnings.
-
-## Current limitations
-
-- inline WYSIWYG editing is not yet implemented;
-- warnings are informative but not yet interactive;
-- support for complex Markdown content errors remains intentionally minimal.
 
 ## Development
 
