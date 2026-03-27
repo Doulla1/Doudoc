@@ -1,0 +1,100 @@
+{
+  "name": "doudoc",
+  "displayName": "Doudoc",
+  "description": "Workspace documentation explorer and reader for /docs",
+  "version": "0.0.1",
+  "publisher": "adiallo",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adiallo/Doudoc.git"
+  },
+  "files": [
+    "dist/**",
+    "media/**",
+    "README.md",
+    "LICENSE.txt",
+    "package.json"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:doudoc.explorerView",
+    "onCommand:doudoc.openPanel",
+    "onCommand:doudoc.refresh"
+  ],
+  "main": "./dist/extension.js",
+  "icon": "media/logo.png",
+  "contributes": {
+    "commands": [
+      {
+        "command": "doudoc.openPanel",
+        "title": "Doudoc: Open Documentation Panel",
+        "icon": "$(book)"
+      },
+      {
+        "command": "doudoc.refresh",
+        "title": "Doudoc: Refresh Documentation",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "doudoc",
+          "title": "Doudoc",
+          "icon": "media/logo-monochrome.svg"
+        }
+      ]
+    },
+    "views": {
+      "doudoc": [
+        {
+          "id": "doudoc.explorerView",
+          "name": "Documentation",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "doudoc.openPanel",
+          "when": "view == doudoc.explorerView",
+          "group": "navigation"
+        },
+        {
+          "command": "doudoc.refresh",
+          "when": "view == doudoc.explorerView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node ./scripts/esbuild.mjs",
+    "watch": "node ./scripts/esbuild.mjs --watch",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "npm run build"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/linkify-it": "^5.0.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/mdurl": "^2.0.0",
+    "@types/node": "^22.15.29",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.7.1",
+    "esbuild": "^0.25.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest';
+import { analyzeMarkdown, renderMarkdown } from '../src/core/markdown';
+
+describe('analyzeMarkdown', () => {
+  it('prefers the highest-level heading for the page label and extracts headings', () => {
+    const analysis = analyzeMarkdown([
+      '## Secondary heading',
+      '',
+      '# Main title',
+      '',
+      'Some intro text.',
+      '',
+      '### Details',
+    ].join('\n'));
+
+    expect(analysis.firstTitle).toBe('Main title');
+    expect(analysis.headings).toEqual([
+      { id: 'secondary-heading', depth: 2, text: 'Secondary heading' },
+      { id: 'main-title', depth: 1, text: 'Main title' },
+      { id: 'details', depth: 3, text: 'Details' },
+    ]);
+    expect(analysis.plainText).toContain('Some intro text.');
+  });
+
+  it('converts relative markdown links into internal document targets', () => {
+    const rendered = renderMarkdown('[Read more](guides/setup.md#install)', {
+      currentAbsolutePath: '/workspace/docs/index.md',
+      docsRoot: '/workspace/docs',
+      resolveDocumentHref: (absolutePath) => absolutePath.replace('/workspace/docs/', ''),
+      resolveAssetHref: (absolutePath) => `asset://${absolutePath}`,
+      pathExists: () => true,
+    });
+
+    expect(rendered.html).toContain('href="#"');
+    expect(rendered.html).toContain('data-doc-path="guides/setup.md"');
+    expect(rendered.html).toContain('data-doc-anchor="install"');
+    expect(rendered.warnings).toHaveLength(0);
+  });
+
+  it('resolves local images through the asset resolver', () => {
+    const rendered = renderMarkdown('![Schema](./images/diagram.png)', {
+      currentAbsolutePath: '/workspace/docs/index.md',
+      docsRoot: '/workspace/docs',
+      resolveDocumentHref: (absolutePath) => absolutePath.replace('/workspace/docs/', ''),
+      resolveAssetHref: (absolutePath) => `asset://${absolutePath}`,
+      pathExists: () => true,
+    });
+
+    expect(rendered.html).toContain('src="asset:///workspace/docs/images/diagram.png"');
+    expect(rendered.html).toContain('loading="lazy"');
+    expect(rendered.warnings).toHaveLength(0);
+  });
+
+  it('adds warnings for blocked and missing relative assets', () => {
+    const rendered = renderMarkdown(
+      [
+        '[Outside](../../README.md)',
+        '![Missing](./missing.png)',
+        '[Missing doc](./missing.md)',
+      ].join('\n\n'),
+      {
+        currentAbsolutePath: '/workspace/docs/reference/page.md',
+        docsRoot: '/workspace/docs',
+        resolveDocumentHref: (absolutePath) => absolutePath.replace('/workspace/docs/', ''),
+        resolveAssetHref: (absolutePath) => `asset://${absolutePath}`,
+        pathExists: () => false,
+      },
+    );
+
+    expect(rendered.html).toContain('doc-invalid-link');
+    expect(rendered.html).toContain('doc-asset-warning');
+    expect(rendered.warnings).toEqual([
+      'Blocked relative link outside /docs: ../../README.md',
+      'Missing image asset: ./missing.png',
+      'Missing relative document: ./missing.md',
+    ]);
+  });
+});
