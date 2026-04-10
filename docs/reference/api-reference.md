@@ -4,17 +4,19 @@
 
 ### `doudoc.openPanel`
 
-Ouvre le panneau principal de lecture.
+Ouvre le panneau` principal de lecture`
 
 ### `doudoc.refresh`
 
-Rafraîchit l'index documentaire.
+Rafraîchit l’index
 
-## Views
+## ViewsS
+
+---
 
 ### `doudoc.explorerView`
 
-Affiche la vue compacte dans l'activité bar.
+Affiche la vue compacte dans l’activité bar.
 
 ## Notes
 

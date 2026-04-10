@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { DocsRepository } from '@services/docsRepository';
 import { ExplorerViewProvider } from '@ui/view/ExplorerViewProvider';
 import { DocsPanel } from '@ui/panel/DocsPanel';
@@ -19,6 +21,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let selectedPath: string | null = null;
   let explorerQuery = '';
   let panelQuery = '';
+  let isEditing = false;
+  let editTimestamp: number | null = null;
 
   await repository.refresh();
   selectedPath = repository.getDefaultPagePath();
@@ -49,7 +53,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const watcher = createDocsWatcher(workspaceFolder);
   context.subscriptions.push(
-    watcher.onDidChange(async () => {
+    watcher.onDidChange(async (uri) => {
+      if (isEditing && selectedPath) {
+        const docsRoot = repository.getSnapshot().docsRoot;
+        if (docsRoot) {
+          const changed = uri.fsPath.slice(docsRoot.length + 1).split(/[\\/]/).join('/');
+          if (changed === selectedPath) {
+            const panel = DocsPanel.getCurrent();
+            if (panel) {
+              await panel.postMessage({ type: 'panel-edit-conflict' });
+            }
+            return;
+          }
+        }
+      }
       await repository.refresh();
       ensureSelectedPath();
       await publishAll();
@@ -77,6 +94,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       query?: unknown;
       relativePath?: unknown;
       anchor?: unknown;
+      markdown?: unknown;
+      dataUrl?: unknown;
     };
 
     switch (typedMessage.type) {
@@ -131,6 +150,82 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ensureSelectedPath();
         await publishAll();
         return;
+      case 'panel-enter-edit': {
+        if (!selectedPath) {
+          return;
+        }
+        isEditing = true;
+        editTimestamp = repository.getPageTimestamp(selectedPath);
+        const editPanel = DocsPanel.getCurrent();
+        if (editPanel) {
+          await editPanel.postMessage({ type: 'panel-edit-ready', editTimestamp: editTimestamp ?? 0 });
+        }
+        return;
+      }
+      case 'panel-save-page': {
+        if (typeof typedMessage.markdown !== 'string' || !selectedPath) {
+          return;
+        }
+        const savePanel = DocsPanel.getCurrent();
+        try {
+          await repository.savePage(selectedPath, typedMessage.markdown);
+          isEditing = false;
+          editTimestamp = null;
+          await repository.refresh();
+          if (savePanel) {
+            await savePanel.postMessage({ type: 'panel-save-result', success: true });
+            await publishPanelState(savePanel);
+            await publishCurrentPage(savePanel);
+          }
+          await publishExplorerState();
+        } catch (error) {
+          if (savePanel) {
+            const reason = error instanceof Error ? error.message : 'Unknown error';
+            await savePanel.postMessage({ type: 'panel-save-result', success: false, error: reason });
+          }
+        }
+        return;
+      }
+      case 'panel-cancel-edit':
+        isEditing = false;
+        editTimestamp = null;
+        return;
+      case 'panel-paste-image': {
+        if (typeof typedMessage.dataUrl !== 'string' || !isEditing) {
+          return;
+        }
+        const pastePanel = DocsPanel.getCurrent();
+        if (!pastePanel) {
+          return;
+        }
+        try {
+          const docsRoot = repository.getSnapshot().docsRoot;
+          if (!docsRoot) {
+            throw new Error('No docs directory found');
+          }
+          const assetsDir = path.join(docsRoot, 'assets');
+          await fs.mkdir(assetsDir, { recursive: true });
+
+          const match = /^data:image\/([\w+]+);base64,(.+)$/.exec(typedMessage.dataUrl);
+          if (!match) {
+            throw new Error('Invalid image data');
+          }
+          const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+          const buffer = Buffer.from(match[2], 'base64');
+          const timestamp = new Date().toISOString().replaceAll(/[-:T]/g, '').slice(0, 14);
+          const fileName = `image-${timestamp}.${ext}`;
+          const absolutePath = path.join(assetsDir, fileName);
+          await fs.writeFile(absolutePath, buffer);
+
+          const relativePath = `assets/${fileName}`;
+          const assetUri = pastePanel.getWebview().asWebviewUri(vscode.Uri.file(absolutePath)).toString();
+          await pastePanel.postMessage({ type: 'panel-paste-image-result', success: true, relativePath, assetUri });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'Unknown error';
+          await pastePanel.postMessage({ type: 'panel-paste-image-result', success: false, error: reason });
+        }
+        return;
+      }
       default:
         return;
     }
@@ -141,7 +236,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const panel = DocsPanel.getCurrent();
     if (panel) {
       await publishPanelState(panel);
-      await publishCurrentPage(panel);
+      if (!isEditing) {
+        await publishCurrentPage(panel);
+      }
     }
   }
 

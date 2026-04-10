@@ -11,7 +11,11 @@ export type PanelToHostMessage =
   | { type: 'panel-search'; query: string }
   | { type: 'panel-open-page'; relativePath: string; anchor?: string }
   | { type: 'toggle-theme' }
-  | { type: 'refresh-docs' };
+  | { type: 'refresh-docs' }
+  | { type: 'panel-enter-edit' }
+  | { type: 'panel-save-page'; markdown: string }
+  | { type: 'panel-cancel-edit' }
+  | { type: 'panel-paste-image'; dataUrl: string };
 
 export type HostToExplorerMessage =
   | {
@@ -41,4 +45,23 @@ export type HostToPanelMessage =
       type: 'panel-page';
       page: RenderedDocPage | null;
       anchor?: string;
+    }
+  | {
+      type: 'panel-edit-ready';
+      editTimestamp: number;
+    }
+  | {
+      type: 'panel-save-result';
+      success: boolean;
+      error?: string;
+    }
+  | {
+      type: 'panel-edit-conflict';
+    }
+  | {
+      type: 'panel-paste-image-result';
+      success: boolean;
+      relativePath?: string;
+      assetUri?: string;
+      error?: string;
     };

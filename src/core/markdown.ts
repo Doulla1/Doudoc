@@ -179,6 +179,7 @@ export function renderMarkdown(markdown: string, context: RenderContext): { html
       return self.renderToken(tokensArg, idx, options);
     }
 
+    token.attrSet('data-original-href', href);
     token.attrSet('href', context.resolveAssetHref(resolvedPath));
     token.attrSet('target', '_blank');
     token.attrSet('rel', 'noreferrer noopener');
@@ -210,6 +211,7 @@ export function renderMarkdown(markdown: string, context: RenderContext): { html
       return `<div class="doc-asset-warning">Missing image asset: <code>${escapeHtml(src)}</code></div>`;
     }
 
+    token.attrSet('data-original-src', src);
     token.attrSet('src', context.resolveAssetHref(resolvedPath));
     token.attrSet('loading', 'lazy');
     return self.renderToken(tokensArg, idx, options);

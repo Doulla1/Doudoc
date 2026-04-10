@@ -123,6 +123,29 @@ export class DocsRepository {
     return this.snapshot.pages[0]?.relativePath ?? null;
   }
 
+  async savePage(relativePath: string, markdown: string): Promise<void> {
+    if (!this.snapshot.docsRoot) {
+      throw new Error('No docs directory found');
+    }
+    const absolutePath = path.join(this.snapshot.docsRoot, relativePath);
+    if (!absolutePath.startsWith(this.snapshot.docsRoot)) {
+      throw new Error('Path escapes docs root');
+    }
+    await fs.writeFile(absolutePath, markdown, 'utf8');
+  }
+
+  getPageTimestamp(relativePath: string): number | null {
+    if (!this.snapshot.docsRoot) {
+      return null;
+    }
+    const absolutePath = path.join(this.snapshot.docsRoot, relativePath);
+    try {
+      return syncFs.statSync(absolutePath).mtimeMs;
+    } catch {
+      return null;
+    }
+  }
+
   private async readDirectory(
     currentAbsolutePath: string,
     docsRoot: string,

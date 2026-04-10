@@ -16,7 +16,13 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <div class="header-search">
           <input id="page-search" class="search-input header-search-input" type="search" placeholder="Find in current page" />
         </div>
+        <div id="edit-actions" class="edit-actions" style="display:none">
+          <span id="edit-status" class="edit-status"></span>
+          <button id="save-btn" class="edit-action-btn save-btn" type="button">Save</button>
+          <button id="cancel-btn" class="edit-action-btn cancel-btn" type="button">Cancel</button>
+        </div>
         <div class="header-actions">
+          <button class="icon-button is-plain header-edit-toggle" id="edit-toggle" type="button" aria-label="Edit page" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.548 20.938h16.9a.75.75 0 0 1 0 1.5H3.548a.75.75 0 0 1 0-1.5ZM18.205 2.295a2.423 2.423 0 0 1 3.426 3.426l-1.38 1.38-3.427-3.426 1.38-1.38Zm-2.44 2.44 3.427 3.427L8.52 18.834a.75.75 0 0 1-.349.197l-4.5 1.273a.75.75 0 0 1-.926-.926l1.273-4.5a.75.75 0 0 1 .197-.349L14.765 4.735Z"/></svg></button>
           <button class="icon-button is-plain header-theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
         </div>
       </header>
@@ -35,6 +41,49 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <main class="content-shell">
           <div class="page-toolbar">
             <div id="page-search-meta" class="search-meta"></div>
+          </div>
+          <div id="edit-toolbar" class="edit-toolbar" style="display:none">
+            <div class="edit-toolbar-group">
+              <button class="edit-btn" data-cmd="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>
+              <button class="edit-btn" data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button>
+              <button class="edit-btn" data-cmd="strikethrough" title="Strikethrough"><s>S</s></button>
+            </div>
+            <div class="edit-toolbar-sep"></div>
+            <div class="edit-toolbar-group">
+              <button class="edit-btn" data-cmd="heading1" title="Heading 1">H1</button>
+              <button class="edit-btn" data-cmd="heading2" title="Heading 2">H2</button>
+              <button class="edit-btn" data-cmd="heading3" title="Heading 3">H3</button>
+            </div>
+            <div class="edit-toolbar-sep"></div>
+            <div class="edit-toolbar-group">
+              <button class="edit-btn" data-cmd="blockquote" title="Blockquote">&ldquo;</button>
+              <button class="edit-btn" data-cmd="code" title="Inline code">&lt;/&gt;</button>
+              <button class="edit-btn" data-cmd="codeblock" title="Code block">{ }</button>
+            </div>
+            <div class="edit-toolbar-sep"></div>
+            <div class="edit-toolbar-group">
+              <button class="edit-btn" data-cmd="ul" title="Bullet list">&bull; list</button>
+              <button class="edit-btn" data-cmd="ol" title="Numbered list">1. list</button>
+              <button class="edit-btn" data-cmd="hr" title="Horizontal rule">&mdash;</button>
+            </div>
+            <div class="edit-toolbar-sep"></div>
+            <div class="edit-toolbar-group">
+              <button class="edit-btn" data-cmd="link" title="Insert link">Link</button>
+              <button class="edit-btn" data-cmd="image" title="Insert image">Img</button>
+            </div>
+          </div>
+          <div id="edit-conflict" class="edit-conflict" style="display:none">
+            <strong>Conflict:</strong> This file was modified externally. Save will overwrite those changes. <button id="conflict-dismiss" class="edit-conflict-dismiss" type="button">Dismiss</button>
+          </div>
+          <div id="insert-dialog" class="insert-dialog" style="display:none">
+            <div class="insert-dialog-inner">
+              <div class="insert-dialog-title" id="insert-dialog-title">Insert</div>
+              <div class="insert-dialog-fields" id="insert-dialog-fields"></div>
+              <div class="insert-dialog-actions">
+                <button id="insert-dialog-ok" class="edit-action-btn save-btn" type="button">OK</button>
+                <button id="insert-dialog-cancel" class="edit-action-btn cancel-btn insert-dialog-cancel-btn" type="button">Cancel</button>
+              </div>
+            </div>
           </div>
           <div id="page-warnings" class="page-warnings"></div>
           <section id="content" class="content"></section>
@@ -74,7 +123,25 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const pageWarningsEl = document.getElementById('page-warnings');
     const themeToggleEl = document.getElementById('theme-toggle');
     const sidebarToggleEl = document.getElementById('sidebar-toggle');
+    const editToggleEl = document.getElementById('edit-toggle');
+    const editToolbarEl = document.getElementById('edit-toolbar');
+    const editActionsEl = document.getElementById('edit-actions');
+    const editStatusEl = document.getElementById('edit-status');
+    const editConflictEl = document.getElementById('edit-conflict');
+    const saveBtnEl = document.getElementById('save-btn');
+    const cancelBtnEl = document.getElementById('cancel-btn');
+    const conflictDismissEl = document.getElementById('conflict-dismiss');
+    const insertDialogEl = document.getElementById('insert-dialog');
+    const insertDialogTitleEl = document.getElementById('insert-dialog-title');
+    const insertDialogFieldsEl = document.getElementById('insert-dialog-fields');
+    const insertDialogOkEl = document.getElementById('insert-dialog-ok');
+    const insertDialogCancelEl = document.getElementById('insert-dialog-cancel');
+    let insertDialogResolve = null;
     let tocObserver = null;
+    let isEditMode = false;
+    let originalHtml = '';
+    let hasUnsavedChanges = false;
+    let pasteImageRange = null;
 
     function escapeHtml(value) {
       return value
@@ -122,6 +189,11 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     function bindTree() {
       treeEl.querySelectorAll('[data-file-path]').forEach((button) => {
         button.addEventListener('click', () => {
+          if (isEditMode && hasUnsavedChanges) {
+            editStatusEl.textContent = 'Save or cancel before navigating';
+            return;
+          }
+          if (isEditMode) cancelEdit();
           vscode.postMessage({ type: 'panel-open-page', relativePath: button.dataset.filePath });
         });
       });
@@ -262,6 +334,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       contentEl.querySelectorAll('a[data-doc-path]').forEach((link) => {
         link.addEventListener('click', (event) => {
           event.preventDefault();
+          if (isEditMode) return;
           vscode.postMessage({
             type: 'panel-open-page',
             relativePath: link.dataset.docPath,
@@ -421,6 +494,493 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => tocObserver.observe(heading));
     }
 
+    /* ── WYSIWYG edit mode ── */
+
+    function enterEditMode() {
+      if (!currentPage || isEditMode) return;
+      isEditMode = true;
+      hasUnsavedChanges = false;
+      clearHighlights();
+
+      const article = contentEl.querySelector('.doc-article');
+      if (article) {
+        originalHtml = article.innerHTML;
+        article.setAttribute('contenteditable', 'true');
+        article.classList.add('is-editing');
+      }
+
+      editToolbarEl.style.display = '';
+      editActionsEl.style.display = '';
+      editToggleEl.style.display = 'none';
+      editConflictEl.style.display = 'none';
+      editStatusEl.textContent = '';
+
+      vscode.postMessage({ type: 'panel-enter-edit' });
+    }
+
+    function exitEditMode() {
+      isEditMode = false;
+      hasUnsavedChanges = false;
+
+      const article = contentEl.querySelector('.doc-article');
+      if (article) {
+        article.removeAttribute('contenteditable');
+        article.classList.remove('is-editing');
+      }
+
+      editToolbarEl.style.display = 'none';
+      editActionsEl.style.display = 'none';
+      editConflictEl.style.display = 'none';
+      if (currentPage) editToggleEl.style.display = '';
+    }
+
+    function cancelEdit() {
+      const article = contentEl.querySelector('.doc-article');
+      if (article) article.innerHTML = originalHtml;
+      exitEditMode();
+      vscode.postMessage({ type: 'panel-cancel-edit' });
+    }
+
+    function saveEdit() {
+      const article = contentEl.querySelector('.doc-article');
+      if (!article) return;
+      editStatusEl.textContent = 'Saving...';
+      saveBtnEl.disabled = true;
+      const markdown = contentToMarkdown(article);
+      vscode.postMessage({ type: 'panel-save-page', markdown });
+    }
+
+    /* ── Toolbar commands ── */
+
+    function execToolbarCommand(cmd) {
+      const article = contentEl.querySelector('.doc-article');
+      if (!article) return;
+      article.focus();
+
+      switch (cmd) {
+        case 'bold': document.execCommand('bold'); break;
+        case 'italic': document.execCommand('italic'); break;
+        case 'strikethrough': document.execCommand('strikethrough'); break;
+        case 'heading1': document.execCommand('formatBlock', false, 'h1'); break;
+        case 'heading2': document.execCommand('formatBlock', false, 'h2'); break;
+        case 'heading3': document.execCommand('formatBlock', false, 'h3'); break;
+        case 'blockquote': document.execCommand('formatBlock', false, 'blockquote'); break;
+        case 'ul': document.execCommand('insertUnorderedList'); break;
+        case 'ol': document.execCommand('insertOrderedList'); break;
+        case 'hr': document.execCommand('insertHorizontalRule'); break;
+        case 'code': wrapSelectionInline('code'); break;
+        case 'codeblock': insertCodeBlock(); break;
+        case 'link': promptInsertLink(); break;
+        case 'image': promptInsertImage(); break;
+      }
+    }
+
+    function wrapSelectionInline(tag) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      const el = document.createElement(tag);
+      try {
+        range.surroundContents(el);
+      } catch {
+        el.textContent = sel.toString();
+        range.deleteContents();
+        range.insertNode(el);
+      }
+      sel.removeAllRanges();
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      sel.addRange(r);
+    }
+
+    function insertCodeBlock() {
+      const sel = window.getSelection();
+      const text = sel?.toString() || 'code';
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.textContent = text;
+      pre.appendChild(code);
+      if (sel && sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(pre);
+        range.setStartAfter(pre);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+
+    function showInsertDialog(title, fields) {
+      return new Promise(function(resolve) {
+        insertDialogTitleEl.textContent = title;
+        insertDialogFieldsEl.innerHTML = fields.map(function(f) {
+          return '<label class="insert-dialog-label">' + escapeHtml(f.label) +
+            '<input class="insert-dialog-input search-input" type="text" data-field="' +
+            escapeHtml(f.name) + '" placeholder="' + escapeHtml(f.placeholder || '') +
+            '" value="' + escapeHtml(f.value || '') + '" /></label>';
+        }).join('');
+        insertDialogEl.style.display = '';
+        var firstInput = insertDialogFieldsEl.querySelector('input');
+        if (firstInput) firstInput.focus();
+        insertDialogResolve = resolve;
+      });
+    }
+
+    function closeInsertDialog(result) {
+      insertDialogEl.style.display = 'none';
+      if (insertDialogResolve) {
+        insertDialogResolve(result);
+        insertDialogResolve = null;
+      }
+    }
+
+    insertDialogOkEl.addEventListener('click', function() {
+      var inputs = insertDialogFieldsEl.querySelectorAll('input[data-field]');
+      var data = {};
+      inputs.forEach(function(input) { data[input.dataset.field] = input.value; });
+      closeInsertDialog(data);
+    });
+
+    insertDialogCancelEl.addEventListener('click', function() {
+      closeInsertDialog(null);
+    });
+
+    insertDialogEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        insertDialogOkEl.click();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeInsertDialog(null);
+      }
+    });
+
+    function promptInsertLink() {
+      const sel = window.getSelection();
+      const selectedText = sel?.toString() || '';
+      let savedRange = null;
+      if (sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
+
+      showInsertDialog('Insert Link', [
+        { name: 'url', label: 'URL', placeholder: 'https://... or relative .md path' },
+        { name: 'text', label: 'Display text', placeholder: 'Link text', value: selectedText }
+      ]).then(function(data) {
+        if (!data || !data.url) return;
+        const display = data.text || data.url;
+        const a = document.createElement('a');
+        if (data.url.endsWith('.md') || (data.url.includes('/') && !data.url.includes('://'))) {
+          a.href = '#';
+          a.setAttribute('data-doc-path', data.url);
+        } else {
+          a.href = data.url;
+          a.target = '_blank';
+          a.rel = 'noreferrer noopener';
+        }
+        a.textContent = display;
+        if (savedRange) {
+          const s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(savedRange);
+          savedRange.deleteContents();
+          savedRange.insertNode(a);
+          savedRange.setStartAfter(a);
+          savedRange.collapse(true);
+          s.removeAllRanges();
+          s.addRange(savedRange);
+        }
+      });
+    }
+
+    function promptInsertImage() {
+      const sel = window.getSelection();
+      let savedRange = null;
+      if (sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
+
+      showInsertDialog('Insert Image', [
+        { name: 'src', label: 'Image path', placeholder: 'Relative path to image' },
+        { name: 'alt', label: 'Alt text', placeholder: 'Description' }
+      ]).then(function(data) {
+        if (!data || !data.src) return;
+        const img = document.createElement('img');
+        img.setAttribute('data-original-src', data.src);
+        img.src = data.src;
+        img.alt = data.alt || '';
+        if (savedRange) {
+          const s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(savedRange);
+          savedRange.deleteContents();
+          savedRange.insertNode(img);
+          savedRange.setStartAfter(img);
+          savedRange.collapse(true);
+          s.removeAllRanges();
+          s.addRange(savedRange);
+        }
+      });
+    }
+
+    /* ── HTML → Markdown converter ── */
+
+    function contentToMarkdown(container) {
+      return processBlocks(container).replace(/\\n{3,}/g, '\\n\\n').trim() + '\\n';
+    }
+
+    function processBlocks(container) {
+      let md = '';
+      for (const child of container.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const t = child.textContent.trim();
+          if (t) md += t + '\\n\\n';
+          continue;
+        }
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        const tag = child.tagName.toLowerCase();
+        switch (tag) {
+          case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6': {
+            const lvl = parseInt(tag[1]);
+            const text = inlineContent(child).trim();
+            if (text) md += '#'.repeat(lvl) + ' ' + text + '\\n\\n';
+            break;
+          }
+          case 'p': {
+            const text = inlineContent(child);
+            if (text.trim()) md += text + '\\n\\n';
+            break;
+          }
+          case 'pre': {
+            const codeEl = child.querySelector('code');
+            const langMatch = codeEl?.className?.match(/language-(\\w+)/);
+            const lang = langMatch ? langMatch[1] : '';
+            const raw = codeEl?.textContent || child.textContent || '';
+            md += '\\u0060\\u0060\\u0060' + lang + '\\n' + raw + '\\n\\u0060\\u0060\\u0060\\n\\n';
+            break;
+          }
+          case 'ul':
+            md += processList(child, '-') + '\\n';
+            break;
+          case 'ol':
+            md += processOrderedList(child) + '\\n';
+            break;
+          case 'blockquote': {
+            const inner = processBlocks(child).trim();
+            md += inner.split('\\n').map(function(l) { return '> ' + l; }).join('\\n') + '\\n\\n';
+            break;
+          }
+          case 'hr':
+            md += '---\\n\\n';
+            break;
+          case 'table':
+            md += processTable(child) + '\\n\\n';
+            break;
+          case 'img':
+            md += renderImageMd(child) + '\\n\\n';
+            break;
+          case 'div':
+            if (child.classList.contains('doc-asset-warning')) break;
+            md += processBlocks(child);
+            break;
+          default:
+            md += processBlocks(child);
+        }
+      }
+      return md;
+    }
+
+    function inlineContent(el) {
+      let result = '';
+      for (const child of el.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          result += child.textContent;
+          continue;
+        }
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        const tag = child.tagName.toLowerCase();
+        switch (tag) {
+          case 'strong': case 'b':
+            result += '**' + inlineContent(child) + '**';
+            break;
+          case 'em': case 'i':
+            result += '*' + inlineContent(child) + '*';
+            break;
+          case 'del': case 's':
+            result += '~~' + inlineContent(child) + '~~';
+            break;
+          case 'code':
+            result += '\\u0060' + (child.textContent || '') + '\\u0060';
+            break;
+          case 'a':
+            result += renderLinkMd(child);
+            break;
+          case 'img':
+            result += renderImageMd(child);
+            break;
+          case 'br':
+            result += '  \\n';
+            break;
+          case 'mark':
+            result += inlineContent(child);
+            break;
+          default:
+            result += inlineContent(child);
+        }
+      }
+      return result;
+    }
+
+    function renderLinkMd(el) {
+      const text = inlineContent(el);
+      const docPath = el.getAttribute('data-doc-path');
+      if (docPath) {
+        const anchor = el.getAttribute('data-doc-anchor');
+        const href = anchor ? docPath + '#' + anchor : docPath;
+        return '[' + text + '](' + href + ')';
+      }
+      const originalHref = el.getAttribute('data-original-href') || el.getAttribute('href') || '';
+      if (originalHref && originalHref !== '#') {
+        return '[' + text + '](' + originalHref + ')';
+      }
+      return text;
+    }
+
+    function renderImageMd(el) {
+      const src = el.getAttribute('data-original-src') || el.getAttribute('src') || '';
+      const alt = el.getAttribute('alt') || '';
+      return '![' + alt + '](' + src + ')';
+    }
+
+    function processList(ul, marker) {
+      let md = '';
+      for (const li of ul.children) {
+        if (li.tagName.toLowerCase() !== 'li') continue;
+        const clone = li.cloneNode(true);
+        clone.querySelectorAll('ul, ol').forEach(function(l) { l.remove(); });
+        const text = inlineContent(clone).trim();
+        md += marker + ' ' + text + '\\n';
+        const nestedUl = li.querySelector(':scope > ul');
+        const nestedOl = li.querySelector(':scope > ol');
+        if (nestedUl) {
+          md += processList(nestedUl, marker).split('\\n').filter(Boolean).map(function(l) { return '  ' + l; }).join('\\n') + '\\n';
+        }
+        if (nestedOl) {
+          md += processOrderedList(nestedOl).split('\\n').filter(Boolean).map(function(l) { return '  ' + l; }).join('\\n') + '\\n';
+        }
+      }
+      return md;
+    }
+
+    function processOrderedList(ol) {
+      let md = '';
+      let num = 1;
+      for (const li of ol.children) {
+        if (li.tagName.toLowerCase() !== 'li') continue;
+        const clone = li.cloneNode(true);
+        clone.querySelectorAll('ul, ol').forEach(function(l) { l.remove(); });
+        const text = inlineContent(clone).trim();
+        md += num + '. ' + text + '\\n';
+        num++;
+        const nestedUl = li.querySelector(':scope > ul');
+        const nestedOl = li.querySelector(':scope > ol');
+        if (nestedUl) {
+          md += processList(nestedUl, '-').split('\\n').filter(Boolean).map(function(l) { return '   ' + l; }).join('\\n') + '\\n';
+        }
+        if (nestedOl) {
+          md += processOrderedList(nestedOl).split('\\n').filter(Boolean).map(function(l) { return '   ' + l; }).join('\\n') + '\\n';
+        }
+      }
+      return md;
+    }
+
+    function processTable(table) {
+      const rows = Array.from(table.querySelectorAll('tr'));
+      if (!rows.length) return '';
+      const headers = Array.from(rows[0].querySelectorAll('th, td'));
+      const headerTexts = headers.map(function(h) { return inlineContent(h).trim(); });
+      let md = '| ' + headerTexts.join(' | ') + ' |\\n';
+      md += '| ' + headerTexts.map(function() { return '---'; }).join(' | ') + ' |\\n';
+      for (let i = 1; i < rows.length; i++) {
+        const cells = Array.from(rows[i].querySelectorAll('td'));
+        const texts = cells.map(function(c) { return inlineContent(c).trim(); });
+        while (texts.length < headerTexts.length) texts.push('');
+        md += '| ' + texts.join(' | ') + ' |\\n';
+      }
+      return md;
+    }
+
+    /* ── Edit event listeners ── */
+
+    editToggleEl.addEventListener('click', enterEditMode);
+
+    saveBtnEl.addEventListener('click', saveEdit);
+
+    cancelBtnEl.addEventListener('click', cancelEdit);
+
+    conflictDismissEl.addEventListener('click', function() {
+      editConflictEl.style.display = 'none';
+    });
+
+    editToolbarEl.addEventListener('click', function(event) {
+      const btn = event.target.closest('[data-cmd]');
+      if (btn) {
+        event.preventDefault();
+        execToolbarCommand(btn.dataset.cmd);
+      }
+    });
+
+    contentEl.addEventListener('input', function() {
+      if (isEditMode) hasUnsavedChanges = true;
+    });
+
+    contentEl.addEventListener('paste', function(e) {
+      if (!isEditMode) return;
+
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            e.preventDefault();
+            const file = items[i].getAsFile();
+            if (!file) return;
+            const sel = window.getSelection();
+            const savedRange = (sel && sel.rangeCount) ? sel.getRangeAt(0).cloneRange() : null;
+            const reader = new FileReader();
+            reader.onload = function() {
+              pasteImageRange = savedRange;
+              vscode.postMessage({ type: 'panel-paste-image', dataUrl: reader.result });
+            };
+            reader.readAsDataURL(file);
+            return;
+          }
+        }
+      }
+
+      e.preventDefault();
+      const html = e.clipboardData?.getData('text/html');
+      const text = e.clipboardData?.getData('text/plain');
+      if (html) {
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        temp.querySelectorAll('[style]').forEach(function(el) { el.removeAttribute('style'); });
+        temp.querySelectorAll('[class]').forEach(function(el) {
+          const cls = el.className;
+          if (!cls.includes('language-')) el.removeAttribute('class');
+        });
+        document.execCommand('insertHTML', false, temp.innerHTML);
+      } else if (text) {
+        document.execCommand('insertText', false, text);
+      }
+    });
+
+    contentEl.addEventListener('keydown', function(e) {
+      if (!isEditMode) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveEdit();
+      }
+    });
+
     globalSearchEl.addEventListener('input', (event) => {
       vscode.postMessage({ type: 'panel-search', query: event.target.value });
     });
@@ -462,7 +1022,57 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       }
 
       if (message.type === 'panel-page') {
+        if (isEditMode) return;
         renderPage(message.page, message.anchor);
+        editToggleEl.style.display = message.page ? '' : 'none';
+        return;
+      }
+
+      if (message.type === 'panel-edit-ready') {
+        return;
+      }
+
+      if (message.type === 'panel-save-result') {
+        saveBtnEl.disabled = false;
+        if (message.success) {
+          exitEditMode();
+        } else {
+          editStatusEl.textContent = 'Error: ' + (message.error || 'Save failed');
+        }
+        return;
+      }
+
+      if (message.type === 'panel-edit-conflict') {
+        editConflictEl.style.display = '';
+        return;
+      }
+
+      if (message.type === 'panel-paste-image-result') {
+        if (!message.success || !message.relativePath || !message.assetUri) {
+          editStatusEl.textContent = 'Image paste failed: ' + (message.error || 'Unknown error');
+          return;
+        }
+        const img = document.createElement('img');
+        img.setAttribute('data-original-src', message.relativePath);
+        img.src = message.assetUri;
+        img.alt = '';
+        if (pasteImageRange) {
+          const s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(pasteImageRange);
+          pasteImageRange.deleteContents();
+          pasteImageRange.insertNode(img);
+          pasteImageRange.setStartAfter(img);
+          pasteImageRange.collapse(true);
+          s.removeAllRanges();
+          s.addRange(pasteImageRange);
+          pasteImageRange = null;
+        } else {
+          const article = contentEl.querySelector('.doc-article');
+          if (article) article.appendChild(img);
+        }
+        hasUnsavedChanges = true;
+        return;
       }
     });
 
@@ -479,22 +1089,25 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       background: var(--bg);
     }
     .shell-header {
-      display: grid;
-      grid-template-columns: 180px minmax(0, 1fr) auto;
+      display: flex;
       align-items: center;
       gap: 16px;
       padding: 0 16px;
       background: var(--header-bg);
       color: #ffffff;
       border-bottom: 1px solid rgba(255,255,255,0.1);
+      height: 52px;
     }
     .header-brand {
       display: flex;
       align-items: center;
       gap: 8px;
       min-width: 0;
+      width: 180px;
+      flex-shrink: 0;
     }
     .header-search {
+      flex: 1;
       min-width: 0;
     }
     .header-search-input {
@@ -639,8 +1252,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       padding-left: 8px;
     }
     .content-shell {
-      display: grid;
-      grid-template-rows: auto auto minmax(0, 1fr);
+      display: flex;
+      flex-direction: column;
       background: var(--bg);
     }
     .page-toolbar {
@@ -665,6 +1278,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       background: var(--bg-muted);
     }
     .content {
+      flex: 1 1 0;
       min-height: 0;
       padding: 0 18px 28px;
     }
@@ -678,6 +1292,9 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
     .doc-article > :first-child {
       margin-top: 0;
+    }
+    .doc-article[contenteditable]:focus {
+      outline: none;
     }
     .doc-article h1,
     .doc-article h2,
@@ -756,6 +1373,161 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     mark.doudoc-highlight.is-current {
       outline: 2px solid var(--accent);
       outline-offset: 1px;
+    }
+    /* ── Edit mode ── */
+    .header-edit-toggle {
+      color: #ffffff;
+    }
+    .header-edit-toggle:hover {
+      background: rgba(255,255,255,0.16);
+    }
+    .edit-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .edit-status {
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+      white-space: nowrap;
+    }
+    .edit-action-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .save-btn {
+      background: #22c55e;
+      color: #ffffff;
+    }
+    .save-btn:hover {
+      background: #16a34a;
+    }
+    .save-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .cancel-btn {
+      background: rgba(255,255,255,0.16);
+      color: #ffffff;
+    }
+    .cancel-btn:hover {
+      background: rgba(255,255,255,0.24);
+    }
+    .edit-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 2em 12px 6px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+    }
+    .edit-toolbar-group {
+      display: flex;
+      gap: 2px;
+    }
+    .edit-toolbar-sep {
+      width: 1px;
+      height: 22px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+    .edit-btn {
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .edit-btn:hover {
+      background: var(--bg-muted);
+      border-color: var(--accent);
+    }
+    .edit-conflict {
+      padding: 8px 14px;
+      margin: 0 18px;
+      border-radius: 8px;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .edit-conflict-dismiss {
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .doc-article.is-editing {
+      min-height: 200px;
+      padding-top: 0;
+    }
+    .doc-article.is-editing > :first-child {
+      margin-top: 0;
+    }
+    .insert-dialog {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 60px;
+      background: rgba(0,0,0,0.35);
+    }
+    .insert-dialog-inner {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      width: 360px;
+      max-width: 90%;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 12px;
+    }
+    .insert-dialog-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .insert-dialog-fields {
+      display: grid;
+      gap: 10px;
+    }
+    .insert-dialog-label {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .insert-dialog-input {
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+    .insert-dialog-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .insert-dialog-cancel-btn {
+      background: var(--bg-muted);
+      color: var(--text);
     }
     details > summary {
       list-style: none;
