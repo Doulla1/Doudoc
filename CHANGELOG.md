@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0
+
+- prise en charge des diagrammes Mermaid dans les blocs de code fencés (rendu SVG interactif dans la `WebviewPanel`)
+- adaptation automatique du thème Mermaid (clair / sombre) selon le thème de l'interface
+- conservation du code source Mermaid pour le round-trip en mode édition
+
 ## 2.0.0
 
 - mode édition inline dans la `WebviewPanel` : basculement lecture / édition par page

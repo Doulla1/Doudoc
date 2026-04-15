@@ -76,3 +76,45 @@ describe('analyzeMarkdown', () => {
     ]);
   });
 });
+
+describe('mermaid diagram support', () => {
+  const ctx = {
+    currentAbsolutePath: '/workspace/docs/index.md',
+    docsRoot: '/workspace/docs',
+    resolveDocumentHref: (absolutePath: string) => absolutePath.replace('/workspace/docs/', ''),
+    resolveAssetHref: (absolutePath: string) => `asset://${absolutePath}`,
+    pathExists: () => true,
+  };
+
+  it('renders mermaid code block as mermaid-block div', () => {
+    const md = '```mermaid\ngraph LR\n  A --> B\n```';
+    const rendered = renderMarkdown(md, ctx);
+
+    expect(rendered.html).toContain('class="mermaid-block"');
+    expect(rendered.html).toContain('data-mermaid-source="');
+    expect(rendered.html).toContain('<pre class="mermaid">');
+    expect(rendered.html).toContain('graph LR');
+    expect(rendered.html).not.toContain('<code class="language-mermaid"');
+  });
+
+  it('renders non-mermaid code blocks normally', () => {
+    const md = '```javascript\nconsole.log("hello");\n```';
+    const rendered = renderMarkdown(md, ctx);
+
+    expect(rendered.html).toContain('<code class="language-javascript"');
+    expect(rendered.html).not.toContain('mermaid-block');
+  });
+
+  it('escapes special characters in mermaid content', () => {
+    const md = '```mermaid\nA -->|"yes"| B\n```';
+    const rendered = renderMarkdown(md, ctx);
+
+    expect(rendered.html).toContain('data-mermaid-source="');
+    expect(rendered.html).toContain('class="mermaid-block"');
+    // The double quotes inside the attribute must be escaped as &quot;
+    const match = rendered.html.match(/data-mermaid-source="([^"]*)"/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toContain('&quot;');
+    expect(match![1]).toContain('A --&gt;|&quot;yes&quot;| B');
+  });
+});

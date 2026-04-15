@@ -217,6 +217,21 @@ export function renderMarkdown(markdown: string, context: RenderContext): { html
     return self.renderToken(tokensArg, idx, options);
   };
 
+  const defaultFence = markdownIt.renderer.rules.fence;
+
+  markdownIt.renderer.rules.fence = (tokensArg: any[], idx: number, options: any, env: unknown, self: any) => {
+    const token = tokensArg[idx];
+    if (token?.info?.trim().toLowerCase() === 'mermaid') {
+      const content = token.content;
+      const escaped = escapeHtml(content.trimEnd());
+      return `<div class="mermaid-block" data-mermaid-source="${escaped}"><pre class="mermaid">${escaped}</pre></div>\n`;
+    }
+    if (defaultFence) {
+      return defaultFence(tokensArg, idx, options, env, self);
+    }
+    return self.renderToken(tokensArg, idx, options);
+  };
+
   return {
     html: markdownIt.renderer.render(tokens, markdownIt.options, {}),
     headings,

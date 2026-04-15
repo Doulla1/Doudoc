@@ -16,7 +16,7 @@ export function wrapHtmlDocument(
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src ${cspSource} data: https:; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${cspSource} https: data:;"
+      content="default-src 'none'; img-src ${cspSource} data: https:; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net; font-src ${cspSource} https: data:;"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title}</title>

@@ -7,6 +7,7 @@ Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/do
 - global search on title + content;
 - in-page search with highlighting;
 - a clickable table of contents;
+- Mermaid diagram rendering in fenced code blocks;
 - support for Markdown relative links and local images.
 
 ## Pre-publication

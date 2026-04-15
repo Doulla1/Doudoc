@@ -91,6 +91,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <aside id="toc" class="toc"></aside>
       </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   `;
 
   const script = `
@@ -142,6 +143,26 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     let originalHtml = '';
     let hasUnsavedChanges = false;
     let pasteImageRange = null;
+
+    // Mermaid initialization
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: '${theme === 'dark' ? 'dark' : 'default'}',
+        securityLevel: 'strict',
+      });
+    }
+
+    async function renderMermaidDiagrams() {
+      if (typeof mermaid === 'undefined') return;
+      const nodes = contentEl.querySelectorAll('.mermaid-block pre.mermaid');
+      if (!nodes.length) return;
+      try {
+        await mermaid.run({ nodes: Array.from(nodes) });
+      } catch (e) {
+        console.warn('Mermaid render error:', e);
+      }
+    }
 
     function escapeHtml(value) {
       return value
@@ -316,6 +337,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       contentEl.innerHTML = '<article class="doc-article">' + page.html + '</article>';
       contentEl.scrollTop = 0;
       bindContentLinks();
+      renderMermaidDiagrams();
       renderToc();
       setupTocObserver();
       if (pageSearchEl.value) {
@@ -780,6 +802,11 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
             break;
           case 'div':
             if (child.classList.contains('doc-asset-warning')) break;
+            if (child.classList.contains('mermaid-block')) {
+              const source = child.getAttribute('data-mermaid-source') || child.textContent || '';
+              md += '\u0060\u0060\u0060mermaid\n' + source.trim() + '\n\u0060\u0060\u0060\n\n';
+              break;
+            }
             md += processBlocks(child);
             break;
           default:
@@ -1012,6 +1039,13 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (message.type === 'panel-state') {
         panelState = message;
         document.documentElement.dataset.theme = panelState.theme;
+        if (typeof mermaid !== 'undefined') {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: panelState.theme === 'dark' ? 'dark' : 'default',
+            securityLevel: 'strict',
+          });
+        }
         globalSearchEl.value = panelState.query;
         renderSidebarToggle();
         renderThemeToggle();
@@ -1329,6 +1363,26 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       border-left: 3px solid var(--accent);
       background: rgba(111,211,255,0.08);
       border-radius: 0 14px 14px 0;
+    }
+    .mermaid-block {
+      margin: 1.2em 0;
+      overflow: auto;
+      border-radius: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 14px;
+      text-align: center;
+    }
+    .mermaid-block pre.mermaid {
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0;
+      text-align: center;
+    }
+    .mermaid-block svg {
+      max-width: 100%;
+      height: auto;
     }
     .toc {
       padding: 16px 12px;

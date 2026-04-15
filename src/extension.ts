@@ -210,8 +210,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           if (!match) {
             throw new Error('Invalid image data');
           }
-          const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
-          const buffer = Buffer.from(match[2], 'base64');
+          const ext = match[1] === 'jpeg' ? 'jpg' : match[1]!;
+          const buffer = Buffer.from(match[2]!, 'base64');
           const timestamp = new Date().toISOString().replaceAll(/[-:T]/g, '').slice(0, 14);
           const fileName = `image-${timestamp}.${ext}`;
           const absolutePath = path.join(assetsDir, fileName);
