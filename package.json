@@ -2,7 +2,7 @@
   "name": "doudoc",
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "publisher": "Doudou",
   "license": "MIT",
   "repository": {
