@@ -91,7 +91,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <aside id="toc" class="toc"></aside>
       </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script async id="mermaid-script" src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   `;
 
   const script = `
@@ -144,17 +144,32 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     let hasUnsavedChanges = false;
     let pasteImageRange = null;
 
-    // Mermaid initialization
-    if (typeof mermaid !== 'undefined') {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: '${theme === 'dark' ? 'dark' : 'default'}',
-        securityLevel: 'strict',
-      });
-    }
+    // Mermaid initialization — deferred via async script load event to avoid blocking page render
+    let mermaidReady = false;
+    (function initMermaid() {
+      function onMermaidLoaded() {
+        if (typeof mermaid === 'undefined') return;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: '${theme === 'dark' ? 'dark' : 'default'}',
+          securityLevel: 'strict',
+        });
+        mermaidReady = true;
+        renderMermaidDiagrams();
+      }
+      if (typeof mermaid !== 'undefined') {
+        // Already loaded (e.g. cached)
+        onMermaidLoaded();
+      } else {
+        const mermaidScript = document.getElementById('mermaid-script');
+        if (mermaidScript) {
+          mermaidScript.addEventListener('load', onMermaidLoaded);
+        }
+      }
+    })();
 
     async function renderMermaidDiagrams() {
-      if (typeof mermaid === 'undefined') return;
+      if (!mermaidReady || typeof mermaid === 'undefined') return;
       const nodes = contentEl.querySelectorAll('.mermaid-block pre.mermaid');
       if (!nodes.length) return;
       try {
@@ -1039,7 +1054,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (message.type === 'panel-state') {
         panelState = message;
         document.documentElement.dataset.theme = panelState.theme;
-        if (typeof mermaid !== 'undefined') {
+        if (mermaidReady && typeof mermaid !== 'undefined') {
           mermaid.initialize({
             startOnLoad: false,
             theme: panelState.theme === 'dark' ? 'dark' : 'default',

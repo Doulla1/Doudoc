@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.1
+
+- correction : le script Mermaid CDN était synchrone/bloquant et empêchait tout affichage dans VS Code Server ; passage en `async` avec initialisation via événement `load`
+- le rendu de la page n'attend plus le chargement du CDN (comportement dégradé élégant si le CDN est inaccessible)
+
 ## 2.1.0
 
 - prise en charge des diagrammes Mermaid dans les blocs de code fencés (rendu SVG interactif dans la `WebviewPanel`)
