@@ -164,20 +164,44 @@ export function createBaseStyles(): string {
       color: var(--text-muted);
     }
     .warning-banner {
-      display: grid;
-      gap: 8px;
-      padding: 14px 16px;
-      border-radius: 16px;
+      display: block;
+      padding: 0;
+      border-radius: 14px;
       border: 1px solid rgba(255, 192, 91, 0.24);
       background: rgba(255, 192, 91, 0.12);
       color: var(--text);
+    }
+    .warning-banner > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+    .warning-banner > summary::-webkit-details-marker {
+      display: none;
+    }
+    .warning-banner > summary::before {
+      content: '';
+      width: 0;
+      height: 0;
+      border-left: 5px solid currentColor;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      transition: transform 120ms ease;
+      opacity: 0.7;
+    }
+    .warning-banner[open] > summary::before {
+      transform: rotate(90deg);
     }
     .warning-banner strong {
       font-size: 13px;
     }
     .warning-banner ul {
       margin: 0;
-      padding-left: 18px;
+      padding: 0 16px 12px 34px;
       color: var(--text-muted);
       font-size: 12px;
     }

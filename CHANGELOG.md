@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.3.0
+
+- correction : la position de défilement est désormais préservée lors d'un changement de thème ou d'une sauvegarde de modifications (le contenu ne remonte plus automatiquement en haut de la page)
+- documentation : confirmation que le collage d'image depuis le presse-papier fonctionne dans l'éditeur (Ctrl+V / Cmd+V en mode édition) — l'image est sauvegardée dans `docs/assets/` et insérée à la position du curseur
+
+## 2.2.0
+
+- coloration syntaxique des blocs de code via `highlight.js` (rendu côté extension host, sans CDN ni script supplémentaire dans la webview)
+- bouton **Copy** sur chaque bloc de code (apparaissant au hover) avec retour visuel « Copied » / « Copy failed »
+- étiquette de langage discrète en haut à gauche de chaque bloc de code (`js`, `python`, etc.)
+- les bandeaux d'avertissement (warnings de scan et warnings de page) sont désormais repliés par défaut (`<details>` cliquable)
+- round-trip HTML→Markdown du nouveau wrapper `.code-block` qui préserve le langage d'origine
+
+## 2.1.3
+
+- task lists GFM (`- [ ]` / `- [x]`) rendues comme des cases à cocher (interactives en mode édition, lecture seule en mode lecture)
+- les tableaux Markdown sont désormais habillés (`<div class="doc-table-wrap">`) avec scroll horizontal, fond d'en-tête, séparateurs et hover de ligne
+- l'alignement de colonne des tableaux (`:---`, `:---:`, `---:`) est préservé lors du round-trip HTML→Markdown en mode édition
+- l'attribut `start` des listes ordonnées HTML est préservé lors du round-trip HTML→Markdown
+- les cases à cocher sont préservées (`[ ]` / `[x]`) lors de la conversion HTML→Markdown
+- styling clarifié pour le strikethrough (`~~text~~`)
+
+## 2.1.2
+
+- correction critique : un caractère backtick non échappé (`\u0060`) suivi d'un saut de ligne réel dans le script du panneau produisait un littéral de chaîne JS non terminé après bundling (SyntaxError), empêchant l'exécution complète du script de la `WebviewPanel` (arbre, contenu et TOC vides au démarrage)
+- les séquences `\u0060` et `\n` du convertisseur HTML→Markdown pour les blocs Mermaid sont désormais correctement échappées (`\\u0060` / `\\n`) afin que la chaîne reste valide une fois injectée dans la webview
+
 ## 2.1.1
 
 - correction : le script Mermaid CDN était synchrone/bloquant et empêchait tout affichage dans VS Code Server ; passage en `async` avec initialisation via événement `load`

@@ -1,8 +1,77 @@
 import MarkdownIt from 'markdown-it';
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import json from 'highlight.js/lib/languages/json';
+import yaml from 'highlight.js/lib/languages/yaml';
+import bash from 'highlight.js/lib/languages/bash';
+import python from 'highlight.js/lib/languages/python';
+import xml from 'highlight.js/lib/languages/xml';
+import css from 'highlight.js/lib/languages/css';
+import scss from 'highlight.js/lib/languages/scss';
+import markdownLang from 'highlight.js/lib/languages/markdown';
+import sql from 'highlight.js/lib/languages/sql';
+import go from 'highlight.js/lib/languages/go';
+import rust from 'highlight.js/lib/languages/rust';
+import java from 'highlight.js/lib/languages/java';
+import php from 'highlight.js/lib/languages/php';
+import ruby from 'highlight.js/lib/languages/ruby';
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
+import ini from 'highlight.js/lib/languages/ini';
+import diff from 'highlight.js/lib/languages/diff';
+import plaintext from 'highlight.js/lib/languages/plaintext';
+import c from 'highlight.js/lib/languages/c';
+import cpp from 'highlight.js/lib/languages/cpp';
+import csharp from 'highlight.js/lib/languages/csharp';
+import shell from 'highlight.js/lib/languages/shell';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createSlug } from './slug';
 import type { DocHeading } from '@shared/types';
+
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('js', javascript);
+hljs.registerLanguage('jsx', javascript);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('ts', typescript);
+hljs.registerLanguage('tsx', typescript);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('yml', yaml);
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('sh', bash);
+hljs.registerLanguage('zsh', bash);
+hljs.registerLanguage('shell', shell);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('py', python);
+hljs.registerLanguage('html', xml);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('svg', xml);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('scss', scss);
+hljs.registerLanguage('sass', scss);
+hljs.registerLanguage('markdown', markdownLang);
+hljs.registerLanguage('md', markdownLang);
+hljs.registerLanguage('sql', sql);
+hljs.registerLanguage('go', go);
+hljs.registerLanguage('rust', rust);
+hljs.registerLanguage('rs', rust);
+hljs.registerLanguage('java', java);
+hljs.registerLanguage('php', php);
+hljs.registerLanguage('ruby', ruby);
+hljs.registerLanguage('rb', ruby);
+hljs.registerLanguage('dockerfile', dockerfile);
+hljs.registerLanguage('docker', dockerfile);
+hljs.registerLanguage('ini', ini);
+hljs.registerLanguage('toml', ini);
+hljs.registerLanguage('diff', diff);
+hljs.registerLanguage('plaintext', plaintext);
+hljs.registerLanguage('text', plaintext);
+hljs.registerLanguage('c', c);
+hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('c++', cpp);
+hljs.registerLanguage('csharp', csharp);
+hljs.registerLanguage('cs', csharp);
 
 export interface MarkdownAnalysis {
   firstTitle: string | null;
@@ -28,12 +97,46 @@ function escapeHtml(value: string): string {
 }
 
 function createMarkdownIt(): MarkdownIt {
-  return new MarkdownIt({
+  const md = new MarkdownIt({
     html: false,
     linkify: true,
     typographer: true,
     breaks: false,
   });
+  md.core.ruler.after('inline', 'doudoc-task-lists', (state) => {
+    const tokens = state.tokens;
+    for (let index = 0; index < tokens.length - 2; index += 1) {
+      const itemOpen = tokens[index];
+      const paragraphOpen = tokens[index + 1];
+      const inline = tokens[index + 2];
+      if (
+        !itemOpen ||
+        !paragraphOpen ||
+        !inline ||
+        itemOpen.type !== 'list_item_open' ||
+        paragraphOpen.type !== 'paragraph_open' ||
+        inline.type !== 'inline'
+      ) {
+        continue;
+      }
+      const match = /^\[([ xX])\]\s+/.exec(inline.content);
+      if (!match) {
+        continue;
+      }
+      const checked = match[1]?.toLowerCase() === 'x';
+      itemOpen.attrJoin('class', 'task-list-item');
+      inline.content = inline.content.slice(match[0].length);
+      const firstChild = inline.children?.[0];
+      if (firstChild && firstChild.type === 'text') {
+        firstChild.content = firstChild.content.replace(/^\[([ xX])\]\s+/, '');
+      }
+      const checkbox = new state.Token('html_inline', '', 0);
+      checkbox.content = `<input type="checkbox" class="task-list-checkbox"${checked ? ' checked' : ''}> `;
+      inline.children?.unshift(checkbox);
+    }
+    return false;
+  });
+  return md;
 }
 
 export function analyzeMarkdown(markdown: string): MarkdownAnalysis {
@@ -219,12 +322,37 @@ export function renderMarkdown(markdown: string, context: RenderContext): { html
 
   const defaultFence = markdownIt.renderer.rules.fence;
 
+  markdownIt.renderer.rules.table_open = () => '<div class="doc-table-wrap"><table>';
+  markdownIt.renderer.rules.table_close = () => '</table></div>';
+
   markdownIt.renderer.rules.fence = (tokensArg: any[], idx: number, options: any, env: unknown, self: any) => {
     const token = tokensArg[idx];
     if (token?.info?.trim().toLowerCase() === 'mermaid') {
       const content = token.content;
       const escaped = escapeHtml(content.trimEnd());
       return `<div class="mermaid-block" data-mermaid-source="${escaped}"><pre class="mermaid">${escaped}</pre></div>\n`;
+    }
+    if (token) {
+      const lang = (token.info || '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+      const raw = token.content ?? '';
+      let highlighted: string;
+      let resolvedLang = lang;
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          highlighted = hljs.highlight(raw, { language: lang, ignoreIllegals: true }).value;
+        } catch {
+          highlighted = escapeHtml(raw);
+        }
+      } else {
+        highlighted = escapeHtml(raw);
+        if (!lang) {
+          resolvedLang = 'text';
+        }
+      }
+      const langAttr = resolvedLang ? ` data-lang="${escapeHtml(resolvedLang)}"` : '';
+      const codeClass = resolvedLang && resolvedLang !== 'text' ? ` class="hljs language-${escapeHtml(resolvedLang)}"` : ' class="hljs"';
+      const langLabel = resolvedLang && resolvedLang !== 'text' ? `<span class="code-block-lang">${escapeHtml(resolvedLang)}</span>` : '';
+      return `<div class="code-block"${langAttr}>${langLabel}<button class="code-copy-btn" type="button" aria-label="Copy code">Copy</button><pre><code${codeClass}>${highlighted}</code></pre></div>\n`;
     }
     if (defaultFence) {
       return defaultFence(tokensArg, idx, options, env, self);

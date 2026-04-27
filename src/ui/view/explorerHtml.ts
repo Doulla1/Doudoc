@@ -90,7 +90,7 @@ export function getExplorerHtml(theme: ThemeMode, cspSource: string): string {
 
       const items = state.warnings.slice(0, 3).map((warning) => '<li>' + escapeHtml(warning) + '</li>').join('');
       const suffix = state.warnings.length > 3 ? '<li>+' + (state.warnings.length - 3) + ' more warning(s)</li>' : '';
-      warningsEl.innerHTML = '<div class="warning-banner"><strong>' + state.warnings.length + ' documentation warning(s)</strong><ul>' + items + suffix + '</ul></div>';
+      warningsEl.innerHTML = '<details class="warning-banner"><summary><strong>' + state.warnings.length + ' documentation warning(s)</strong></summary><ul>' + items + suffix + '</ul></details>';
     }
 
     function countFiles(nodes) {

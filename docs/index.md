@@ -14,9 +14,20 @@ Cette arborescence permet de valider :
 - le sommaire et les ancres ;
 - la recherche globale et la recherche dans la page.
 
-## Commencer
+## Showcase des fonctionnalités
 
-Tu peux lire :
+Parcours les pages de démonstration pour valider chaque capacité de rendu :
+
+| Page | Ce qu'elle teste |
+| :--- | :--------------- |
+| [Typographie & Formatage](./showcase/markdown-bases.md) | H1–H6, gras, italique, barré, code inline, blockquotes, liens, images |
+| [Blocs de code](./showcase/blocs-de-code.md) | Coloration syntaxique (26 langages), bouton Copy, fallback sans langage |
+| [Tableaux](./showcase/tableaux.md) | Alignement colonnes, scroll horizontal, formatage inline dans les cellules |
+| [Diagrammes Mermaid](./showcase/diagrammes.md) | Flowchart, séquence, classes, états, Gantt, secteurs, entités-relations |
+| [Listes & tâches](./showcase/listes-et-taches.md) | Listes imbriquées, numérotation libre, task lists GFM (☑) |
+| [Navigation & liens](./showcase/navigation-liens.md) | Liens internes, externes, avec ancres, liens cassés |
+
+## Guides & référence
 
 - [Getting Started](./guides/getting-started.md)
 - [API Reference](./reference/api-reference.md)

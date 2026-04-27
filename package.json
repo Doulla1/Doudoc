@@ -2,7 +2,7 @@
   "name": "doudoc",
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
-  "version": "2.1.1",
+  "version": "2.3.0",
   "publisher": "Doudou",
   "license": "MIT",
   "repository": {
@@ -101,6 +101,7 @@
     "package": "npx @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
+    "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {

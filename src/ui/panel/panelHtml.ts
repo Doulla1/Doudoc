@@ -280,7 +280,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
 
       const items = panelState.warnings.slice(0, 3).map((warning) => '<li>' + escapeHtml(warning) + '</li>').join('');
       const suffix = panelState.warnings.length > 3 ? '<li>+' + (panelState.warnings.length - 3) + ' more warning(s)</li>' : '';
-      scanWarningsEl.innerHTML = '<div class="warning-banner"><strong>' + panelState.warnings.length + ' scan warning(s)</strong><ul>' + items + suffix + '</ul></div>';
+      scanWarningsEl.innerHTML = '<details class="warning-banner"><summary><strong>' + panelState.warnings.length + ' scan warning(s)</strong></summary><ul>' + items + suffix + '</ul></details>';
     }
 
     function renderThemeToggle() {
@@ -331,6 +331,9 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
 
     function renderPage(page, anchor) {
+      const previousPath = currentPage ? currentPage.relativePath : null;
+      const isSamePage = !!page && page.relativePath === previousPath;
+      const preservedScrollTop = isSamePage ? contentEl.scrollTop : 0;
       currentPage = page;
       clearHighlights();
 
@@ -344,13 +347,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
 
       if (page.warnings.length) {
         const items = page.warnings.map((warning) => '<li>' + escapeHtml(warning) + '</li>').join('');
-        pageWarningsEl.innerHTML = '<div class="warning-banner"><strong>Page warnings</strong><ul>' + items + '</ul></div>';
+        pageWarningsEl.innerHTML = '<details class="warning-banner"><summary><strong>' + page.warnings.length + ' page warning(s)</strong></summary><ul>' + items + '</ul></details>';
       } else {
         pageWarningsEl.innerHTML = '';
       }
 
       contentEl.innerHTML = '<article class="doc-article">' + page.html + '</article>';
-      contentEl.scrollTop = 0;
       bindContentLinks();
       renderMermaidDiagrams();
       renderToc();
@@ -364,6 +366,10 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (anchor) {
         const target = document.getElementById(anchor);
         target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (isSamePage) {
+        contentEl.scrollTop = preservedScrollTop;
+      } else {
+        contentEl.scrollTop = 0;
       }
     }
 
@@ -377,6 +383,28 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
             relativePath: link.dataset.docPath,
             anchor: link.dataset.docAnchor || undefined
           });
+        });
+      });
+      contentEl.querySelectorAll('.code-block .code-copy-btn').forEach((btn) => {
+        btn.addEventListener('click', async (event) => {
+          event.preventDefault();
+          if (isEditMode) return;
+          const block = btn.closest('.code-block');
+          const codeEl = block?.querySelector('pre > code');
+          const text = codeEl ? (codeEl.textContent || '') : '';
+          try {
+            await navigator.clipboard.writeText(text);
+            const original = btn.textContent;
+            btn.textContent = 'Copied';
+            btn.classList.add('is-copied');
+            setTimeout(() => {
+              btn.textContent = original || 'Copy';
+              btn.classList.remove('is-copied');
+            }, 1400);
+          } catch {
+            btn.textContent = 'Copy failed';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 1400);
+          }
         });
       });
     }
@@ -819,7 +847,15 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
             if (child.classList.contains('doc-asset-warning')) break;
             if (child.classList.contains('mermaid-block')) {
               const source = child.getAttribute('data-mermaid-source') || child.textContent || '';
-              md += '\u0060\u0060\u0060mermaid\n' + source.trim() + '\n\u0060\u0060\u0060\n\n';
+              md += '\\u0060\\u0060\\u0060mermaid\\n' + source.trim() + '\\n\\u0060\\u0060\\u0060\\n\\n';
+              break;
+            }
+            if (child.classList.contains('code-block')) {
+              const lang = child.getAttribute('data-lang') || '';
+              const codeEl = child.querySelector('pre > code');
+              const raw = codeEl ? (codeEl.textContent || '') : (child.querySelector('pre')?.textContent || '');
+              const fenceLang = lang === 'text' ? '' : lang;
+              md += '\\u0060\\u0060\\u0060' + fenceLang + '\\n' + raw.replace(/\\n$/, '') + '\\n\\u0060\\u0060\\u0060\\n\\n';
               break;
             }
             md += processBlocks(child);
@@ -864,6 +900,11 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
             break;
           case 'mark':
             result += inlineContent(child);
+            break;
+          case 'input':
+            if ((child.getAttribute('type') || '').toLowerCase() === 'checkbox') {
+              result += child.checked ? '[x] ' : '[ ] ';
+            }
             break;
           default:
             result += inlineContent(child);
@@ -915,7 +956,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
 
     function processOrderedList(ol) {
       let md = '';
-      let num = 1;
+      const startAttr = parseInt(ol.getAttribute('start') || '1', 10);
+      let num = Number.isFinite(startAttr) && startAttr >= 1 ? startAttr : 1;
       for (const li of ol.children) {
         if (li.tagName.toLowerCase() !== 'li') continue;
         const clone = li.cloneNode(true);
@@ -940,8 +982,15 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (!rows.length) return '';
       const headers = Array.from(rows[0].querySelectorAll('th, td'));
       const headerTexts = headers.map(function(h) { return inlineContent(h).trim(); });
+      const aligns = headers.map(function(h) {
+        const a = (h.getAttribute('style') || '').toLowerCase();
+        if (a.includes('text-align:center') || a.includes('text-align: center')) return ':---:';
+        if (a.includes('text-align:right') || a.includes('text-align: right')) return '---:';
+        if (a.includes('text-align:left') || a.includes('text-align: left')) return ':---';
+        return '---';
+      });
       let md = '| ' + headerTexts.join(' | ') + ' |\\n';
-      md += '| ' + headerTexts.map(function() { return '---'; }).join(' | ') + ' |\\n';
+      md += '| ' + aligns.join(' | ') + ' |\\n';
       for (let i = 1; i < rows.length; i++) {
         const cells = Array.from(rows[i].querySelectorAll('td'));
         const texts = cells.map(function(c) { return inlineContent(c).trim(); });
@@ -1361,12 +1410,148 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       border-radius: 8px;
       background: var(--code-bg);
       border: 1px solid var(--border);
+      margin: 0;
     }
     .doc-article code {
       background: var(--code-bg);
       border-radius: 6px;
       padding: 0.1em 0.35em;
     }
+    .doc-article pre > code {
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      display: block;
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+    .code-block {
+      position: relative;
+      margin: 1.2em 0;
+    }
+    .code-block-lang {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      pointer-events: none;
+      user-select: none;
+      z-index: 1;
+    }
+    .code-block:has(.code-block-lang) > pre {
+      padding-top: 30px;
+    }
+    .code-copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+      z-index: 2;
+    }
+    .code-block:hover .code-copy-btn,
+    .code-copy-btn:focus-visible {
+      opacity: 1;
+    }
+    .code-copy-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .code-copy-btn.is-copied {
+      opacity: 1;
+      color: #16a34a;
+      border-color: #16a34a;
+    }
+    .doc-article.is-editing .code-copy-btn {
+      display: none;
+    }
+    /* highlight.js — inlined themes (atom-one) */
+    .hljs { color: var(--text); background: transparent; }
+    html[data-theme='dark'] .hljs-comment,
+    html[data-theme='dark'] .hljs-quote { color: #6b7a8e; font-style: italic; }
+    html[data-theme='dark'] .hljs-doctag,
+    html[data-theme='dark'] .hljs-keyword,
+    html[data-theme='dark'] .hljs-formula { color: #c678dd; }
+    html[data-theme='dark'] .hljs-section,
+    html[data-theme='dark'] .hljs-name,
+    html[data-theme='dark'] .hljs-selector-tag,
+    html[data-theme='dark'] .hljs-deletion,
+    html[data-theme='dark'] .hljs-subst { color: #e06c75; }
+    html[data-theme='dark'] .hljs-literal { color: #56b6c2; }
+    html[data-theme='dark'] .hljs-string,
+    html[data-theme='dark'] .hljs-regexp,
+    html[data-theme='dark'] .hljs-addition,
+    html[data-theme='dark'] .hljs-attribute,
+    html[data-theme='dark'] .hljs-meta .hljs-string { color: #98c379; }
+    html[data-theme='dark'] .hljs-attr,
+    html[data-theme='dark'] .hljs-variable,
+    html[data-theme='dark'] .hljs-template-variable,
+    html[data-theme='dark'] .hljs-type,
+    html[data-theme='dark'] .hljs-selector-class,
+    html[data-theme='dark'] .hljs-selector-attr,
+    html[data-theme='dark'] .hljs-selector-pseudo,
+    html[data-theme='dark'] .hljs-number { color: #d19a66; }
+    html[data-theme='dark'] .hljs-symbol,
+    html[data-theme='dark'] .hljs-bullet,
+    html[data-theme='dark'] .hljs-link,
+    html[data-theme='dark'] .hljs-meta,
+    html[data-theme='dark'] .hljs-selector-id,
+    html[data-theme='dark'] .hljs-title { color: #61aeee; }
+    html[data-theme='dark'] .hljs-built_in,
+    html[data-theme='dark'] .hljs-title.class_,
+    html[data-theme='dark'] .hljs-class .hljs-title { color: #e6c07b; }
+    html[data-theme='dark'] .hljs-emphasis { font-style: italic; }
+    html[data-theme='dark'] .hljs-strong { font-weight: bold; }
+    html[data-theme='dark'] .hljs-link { text-decoration: underline; }
+
+    html[data-theme='light'] .hljs-comment,
+    html[data-theme='light'] .hljs-quote { color: #a0a1a7; font-style: italic; }
+    html[data-theme='light'] .hljs-doctag,
+    html[data-theme='light'] .hljs-keyword,
+    html[data-theme='light'] .hljs-formula { color: #a626a4; }
+    html[data-theme='light'] .hljs-section,
+    html[data-theme='light'] .hljs-name,
+    html[data-theme='light'] .hljs-selector-tag,
+    html[data-theme='light'] .hljs-deletion,
+    html[data-theme='light'] .hljs-subst { color: #e45649; }
+    html[data-theme='light'] .hljs-literal { color: #0184bb; }
+    html[data-theme='light'] .hljs-string,
+    html[data-theme='light'] .hljs-regexp,
+    html[data-theme='light'] .hljs-addition,
+    html[data-theme='light'] .hljs-attribute,
+    html[data-theme='light'] .hljs-meta .hljs-string { color: #50a14f; }
+    html[data-theme='light'] .hljs-attr,
+    html[data-theme='light'] .hljs-variable,
+    html[data-theme='light'] .hljs-template-variable,
+    html[data-theme='light'] .hljs-type,
+    html[data-theme='light'] .hljs-selector-class,
+    html[data-theme='light'] .hljs-selector-attr,
+    html[data-theme='light'] .hljs-selector-pseudo,
+    html[data-theme='light'] .hljs-number { color: #986801; }
+    html[data-theme='light'] .hljs-symbol,
+    html[data-theme='light'] .hljs-bullet,
+    html[data-theme='light'] .hljs-link,
+    html[data-theme='light'] .hljs-meta,
+    html[data-theme='light'] .hljs-selector-id,
+    html[data-theme='light'] .hljs-title { color: #4078f2; }
+    html[data-theme='light'] .hljs-built_in,
+    html[data-theme='light'] .hljs-title.class_,
+    html[data-theme='light'] .hljs-class .hljs-title { color: #c18401; }
+    html[data-theme='light'] .hljs-emphasis { font-style: italic; }
+    html[data-theme='light'] .hljs-strong { font-weight: bold; }
+    html[data-theme='light'] .hljs-link { text-decoration: underline; }
     .doc-article img {
       max-width: 100%;
       border-radius: 10px;
@@ -1378,6 +1563,56 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       border-left: 3px solid var(--accent);
       background: rgba(111,211,255,0.08);
       border-radius: 0 14px 14px 0;
+    }
+    .doc-table-wrap {
+      margin: 1.2em 0;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .doc-table-wrap > table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13.5px;
+    }
+    .doc-table-wrap th,
+    .doc-table-wrap td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    .doc-table-wrap th {
+      background: var(--bg-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-strong);
+    }
+    .doc-table-wrap tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .doc-table-wrap tbody tr:hover td {
+      background: var(--bg-muted);
+    }
+    .doc-article ul:has(> li.task-list-item) {
+      list-style: none;
+      padding-left: 4px;
+    }
+    .doc-article li.task-list-item {
+      position: relative;
+      padding-left: 2px;
+    }
+    .doc-article .task-list-checkbox {
+      margin: 0 8px 0 0;
+      transform: translateY(1px);
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+    .doc-article:not(.is-editing) .task-list-checkbox {
+      pointer-events: none;
+    }
+    .doc-article del,
+    .doc-article s {
+      color: var(--text-muted);
     }
     .mermaid-block {
       margin: 1.2em 0;

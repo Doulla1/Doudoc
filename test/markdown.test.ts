@@ -101,7 +101,10 @@ describe('mermaid diagram support', () => {
     const md = '```javascript\nconsole.log("hello");\n```';
     const rendered = renderMarkdown(md, ctx);
 
-    expect(rendered.html).toContain('<code class="language-javascript"');
+    expect(rendered.html).toContain('class="code-block"');
+    expect(rendered.html).toContain('data-lang="javascript"');
+    expect(rendered.html).toContain('class="hljs language-javascript"');
+    expect(rendered.html).toContain('class="code-copy-btn"');
     expect(rendered.html).not.toContain('mermaid-block');
   });
 
@@ -118,3 +121,52 @@ describe('mermaid diagram support', () => {
     expect(match![1]).toContain('A --&gt;|&quot;yes&quot;| B');
   });
 });
+
+describe('GFM extensions', () => {
+  const ctx = {
+    currentAbsolutePath: '/workspace/docs/index.md',
+    docsRoot: '/workspace/docs',
+    resolveDocumentHref: (absolutePath: string) => absolutePath.replace('/workspace/docs/', ''),
+    resolveAssetHref: (absolutePath: string) => `asset://${absolutePath}`,
+    pathExists: () => true,
+  };
+
+  it('renders task lists with checkboxes', () => {
+    const md = ['- [ ] todo', '- [x] done', '- normal item'].join('\n');
+    const rendered = renderMarkdown(md, ctx);
+
+    expect(rendered.html).toContain('class="task-list-item"');
+    expect(rendered.html).toContain('<input type="checkbox" class="task-list-checkbox"');
+    expect(rendered.html).toContain('checked');
+    expect(rendered.html).toContain('todo');
+    expect(rendered.html).toContain('done');
+    expect(rendered.html).not.toContain('[ ]');
+    expect(rendered.html).not.toContain('[x]');
+  });
+
+  it('wraps tables in a horizontal-scroll container', () => {
+    const md = ['| h1 | h2 |', '| --- | --- |', '| a | b |'].join('\n');
+    const rendered = renderMarkdown(md, ctx);
+
+    expect(rendered.html).toContain('<div class="doc-table-wrap"><table>');
+    expect(rendered.html).toContain('</table></div>');
+    expect(rendered.html).toContain('<th>h1</th>');
+  });
+
+  it('strikethrough renders as <s>', () => {
+    const rendered = renderMarkdown('Hello ~~world~~', ctx);
+    expect(rendered.html).toContain('<s>world</s>');
+  });
+
+  it('applies highlight.js tokens for known languages', () => {
+    const rendered = renderMarkdown('```js\nconst x = 1;\n```', ctx);
+    expect(rendered.html).toContain('hljs-keyword');
+  });
+
+  it('falls back to plain text for unknown languages without crashing', () => {
+    const rendered = renderMarkdown('```nonsense\nhello world\n```', ctx);
+    expect(rendered.html).toContain('class="code-block"');
+    expect(rendered.html).toContain('hello world');
+  });
+});
+
