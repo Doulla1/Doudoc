@@ -23,8 +23,11 @@ export interface DocPageRecord {
   fileName: string;
   relativePath: string;
   absolutePath: string;
+  sourceKey: string;
+  sourceRoot: string;
   rawMarkdown: string;
   plainText: string;
+  wordCount: number;
   headings: DocHeading[];
 }
 
@@ -32,9 +35,20 @@ export interface RenderedDocPage {
   id: string;
   label: string;
   relativePath: string;
+  absolutePath: string;
   html: string;
   headings: DocHeading[];
   warnings: string[];
+  wordCount: number;
+  readingMinutes: number;
+}
+
+export interface DocSourceInfo {
+  key: string;
+  label: string;
+  rootPath: string;
+  exists: boolean;
+  isExternal: boolean;
 }
 
 export interface DocSearchResult {
@@ -49,6 +63,7 @@ export interface DocSearchResult {
 export interface DocsSnapshot {
   docsRoot: string | null;
   hasDocsDirectory: boolean;
+  sources: DocSourceInfo[];
   tree: DocTreeNode[];
   pages: DocPageRecord[];
   warnings: string[];

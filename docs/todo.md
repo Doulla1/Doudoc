@@ -1,3 +1,26 @@
+# Todo — v2.4.0 Tier 1 + multi-source + open any .md
+
+**Début** : 2026-04-27 18:02
+**Fin** : 2026-04-27 18:13
+
+## Tâches
+
+- [x] Setting `doudoc.docsPaths` (array de chemins relatifs au projet, défaut `["docs"]`)
+- [x] Refactor `DocsRepository` pour supporter plusieurs sources documentaires
+- [x] Watchers multi-sources synchronisés
+- [x] Commande `doudoc.openMarkdownFile` (ouvrir n'importe quel `.md` dans le panel)
+- [x] Menu contextuel explorer/editor pour `.md`
+- [x] T1.1 — Navigation back/forward dans la `WebviewPanel`
+- [x] T1.2 — Palette `Cmd/Ctrl+K` quick-open
+- [x] T1.3 — Barre de progression de lecture (scroll)
+- [x] T1.4 — Bouton "Ouvrir dans l'éditeur VS Code"
+- [x] T1.5 — Détection des liens cassés (warnings au scan)
+- [x] T1.6 — Estimation du temps de lecture sous le titre
+- [x] Mettre à jour les tests
+- [x] Mettre à jour la documentation (CHANGELOG, README, todo)
+
+---
+
 # Todo — v2.3.0 paste image + scroll preservation
 
 **Début** : 2026-04-27 17:34

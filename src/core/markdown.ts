@@ -139,6 +139,24 @@ function createMarkdownIt(): MarkdownIt {
   return md;
 }
 
+export function extractRelativeLinks(markdown: string): string[] {
+  const links: string[] = [];
+  const linkRegex = /\[(?:[^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(markdown)) !== null) {
+    const href = match[1];
+    if (!href) continue;
+    if (href.startsWith('#')) continue;
+    if (/^[a-z]+:/i.test(href)) continue;
+    if (href.startsWith('data:')) continue;
+    const cleanHref = href.split('#')[0];
+    if (cleanHref) {
+      links.push(cleanHref);
+    }
+  }
+  return links;
+}
+
 export function analyzeMarkdown(markdown: string): MarkdownAnalysis {
   const markdownIt = createMarkdownIt();
   const tokens = markdownIt.parse(markdown, {});

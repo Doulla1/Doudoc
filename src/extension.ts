@@ -16,6 +16,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   const repository = new DocsRepository(workspaceFolder.uri.fsPath);
+  repository.setConfiguredPaths(readConfiguredPaths());
   let panelTheme: ThemeMode = persistedTheme ?? 'light';
   let explorerTheme: ThemeMode = getActiveTheme();
   let selectedPath: string | null = null;
@@ -23,6 +24,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let panelQuery = '';
   let isEditing = false;
   let editTimestamp: number | null = null;
+  const watcherDisposables: vscode.Disposable[] = [];
 
   await repository.refresh();
   selectedPath = repository.getDefaultPagePath();
@@ -33,6 +35,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.onDidChangeActiveColorTheme(() => {
       explorerTheme = getActiveTheme();
       void publishExplorerState();
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (event) => {
+      if (event.affectsConfiguration('doudoc.docsPaths')) {
+        repository.setConfiguredPaths(readConfiguredPaths());
+        await repository.refresh();
+        ensureSelectedPath();
+        rewireWatchers();
+        await publishAll();
+      }
     }),
   );
 
@@ -49,40 +63,79 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       await publishAll();
     }),
+    vscode.commands.registerCommand('doudoc.openMarkdownFile', async (uri?: vscode.Uri) => {
+      const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
+      if (!targetUri || targetUri.scheme !== 'file') {
+        await vscode.window.showWarningMessage('Doudoc: please target a local Markdown file.');
+        return;
+      }
+      const absolutePath = targetUri.fsPath;
+      if (!absolutePath.toLowerCase().endsWith('.md')) {
+        await vscode.window.showWarningMessage('Doudoc: only .md files can be opened.');
+        return;
+      }
+
+      const existing = repository.getPageByAbsolutePath(absolutePath);
+      if (existing) {
+        selectedPath = existing.relativePath;
+      } else {
+        repository.addExternalFile(absolutePath);
+        await repository.refresh();
+        const added = repository.getPageByAbsolutePath(absolutePath);
+        selectedPath = added?.relativePath ?? selectedPath;
+      }
+
+      const panel = DocsPanel.createOrReveal(context, handleMessage, () => panelTheme);
+      await publishExplorerState();
+      await publishPanelState(panel);
+      await publishCurrentPage(panel);
+    }),
   );
 
-  const watcher = createDocsWatcher(workspaceFolder);
-  context.subscriptions.push(
-    watcher.onDidChange(async (uri) => {
-      if (isEditing && selectedPath) {
-        const docsRoot = repository.getSnapshot().docsRoot;
-        if (docsRoot) {
-          const changed = uri.fsPath.slice(docsRoot.length + 1).split(/[\\/]/).join('/');
-          if (changed === selectedPath) {
-            const panel = DocsPanel.getCurrent();
-            if (panel) {
-              await panel.postMessage({ type: 'panel-edit-conflict' });
-            }
-            return;
-          }
-        }
+  rewireWatchers();
+  context.subscriptions.push({
+    dispose() {
+      while (watcherDisposables.length > 0) {
+        watcherDisposables.pop()?.dispose();
       }
-      await repository.refresh();
-      ensureSelectedPath();
-      await publishAll();
-    }),
-    watcher.onDidCreate(async () => {
-      await repository.refresh();
-      ensureSelectedPath();
-      await publishAll();
-    }),
-    watcher.onDidDelete(async () => {
-      await repository.refresh();
-      ensureSelectedPath();
-      await publishAll();
-    }),
-  );
-  context.subscriptions.push(watcher);
+    },
+  });
+
+  function rewireWatchers(): void {
+    while (watcherDisposables.length > 0) {
+      watcherDisposables.pop()?.dispose();
+    }
+    const seen = new Set<string>();
+    for (const sourcePath of repository.getConfiguredPaths()) {
+      if (seen.has(sourcePath)) continue;
+      seen.add(sourcePath);
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolder!, `${sourcePath.replace(/\/$/, '')}/**`),
+      );
+      watcherDisposables.push(
+        watcher,
+        watcher.onDidChange((uri) => void onWatcherEvent(uri, 'change')),
+        watcher.onDidCreate(() => void onWatcherEvent(null, 'create')),
+        watcher.onDidDelete(() => void onWatcherEvent(null, 'delete')),
+      );
+    }
+  }
+
+  async function onWatcherEvent(uri: vscode.Uri | null, kind: 'change' | 'create' | 'delete'): Promise<void> {
+    if (kind === 'change' && uri && isEditing && selectedPath) {
+      const editingPage = repository.getSnapshot().pages.find((page) => page.relativePath === selectedPath);
+      if (editingPage && path.normalize(uri.fsPath) === editingPage.absolutePath) {
+        const panel = DocsPanel.getCurrent();
+        if (panel) {
+          await panel.postMessage({ type: 'panel-edit-conflict' });
+        }
+        return;
+      }
+    }
+    await repository.refresh();
+    ensureSelectedPath();
+    await publishAll();
+  }
 
   async function handleMessage(message: ExplorerToHostMessage | PanelToHostMessage | unknown): Promise<void> {
     if (!message || typeof message !== 'object' || typeof (message as { type?: unknown }).type !== 'string') {
@@ -199,11 +252,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
         try {
-          const docsRoot = repository.getSnapshot().docsRoot;
-          if (!docsRoot) {
-            throw new Error('No docs directory found');
+          const currentPage = selectedPath
+            ? repository.getSnapshot().pages.find((page) => page.relativePath === selectedPath)
+            : null;
+          if (!currentPage) {
+            throw new Error('No active page');
           }
-          const assetsDir = path.join(docsRoot, 'assets');
+          if (currentPage.sourceKey.startsWith('__ext')) {
+            throw new Error('Pasting images is not supported for external files');
+          }
+          const assetsDir = path.join(currentPage.sourceRoot, 'assets');
           await fs.mkdir(assetsDir, { recursive: true });
 
           const match = /^data:image\/([\w+]+);base64,(.+)$/.exec(typedMessage.dataUrl);
@@ -220,17 +278,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           // Compute relative path from the current page's directory so the
           // markdown-it image resolver (which resolves relative to the page)
           // can locate the asset regardless of how deep the page is.
-          let relativePath = `assets/${fileName}`;
-          if (selectedPath) {
-            const pageAbsoluteDir = path.dirname(path.join(docsRoot, selectedPath));
-            relativePath = path.relative(pageAbsoluteDir, absolutePath).split(path.sep).join('/');
-          }
+          const pageAbsoluteDir = path.dirname(currentPage.absolutePath);
+          const relativePath = path.relative(pageAbsoluteDir, absolutePath).split(path.sep).join('/');
           const assetUri = pastePanel.getWebview().asWebviewUri(vscode.Uri.file(absolutePath)).toString();
           await pastePanel.postMessage({ type: 'panel-paste-image-result', success: true, relativePath, assetUri });
         } catch (error) {
           const reason = error instanceof Error ? error.message : 'Unknown error';
           await pastePanel.postMessage({ type: 'panel-paste-image-result', success: false, error: reason });
         }
+        return;
+      }
+      case 'panel-open-in-editor': {
+        if (typeof typedMessage.relativePath !== 'string') {
+          return;
+        }
+        const target = repository.getSnapshot().pages.find((page) => page.relativePath === typedMessage.relativePath);
+        if (!target) {
+          return;
+        }
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(target.absolutePath));
         return;
       }
       default:
@@ -308,8 +374,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export function deactivate(): void {}
 
-function createDocsWatcher(workspaceFolder: vscode.WorkspaceFolder): vscode.FileSystemWatcher {
-  return vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(workspaceFolder, 'docs/**'));
+function readConfiguredPaths(): string[] {
+  const config = vscode.workspace.getConfiguration('doudoc');
+  const value = config.get<string[]>('docsPaths', ['docs']);
+  if (!Array.isArray(value)) {
+    return ['docs'];
+  }
+  return value
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .map((entry) => entry.trim());
 }
 
 function getActiveTheme(): ThemeMode {

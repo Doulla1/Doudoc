@@ -8,9 +8,13 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       <header class="shell-header">
         <div class="header-brand">
           <button class="icon-button is-plain header-sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Hide sidebar"></button>
+          <div class="header-history">
+            <button class="icon-button is-plain header-history-btn" id="history-back" type="button" aria-label="Go back" title="Back" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+            <button class="icon-button is-plain header-history-btn" id="history-forward" type="button" aria-label="Go forward" title="Forward" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg></button>
+          </div>
           <div class="brand-copy">
             <div class="brand-title">Documentation</div>
-            <div class="brand-subtitle">Current page</div>
+            <div class="brand-subtitle" id="brand-subtitle">Current page</div>
           </div>
         </div>
         <div class="header-search">
@@ -22,6 +26,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           <button id="cancel-btn" class="edit-action-btn cancel-btn" type="button">Cancel</button>
         </div>
         <div class="header-actions">
+          <button class="icon-button is-plain header-palette-toggle" id="palette-toggle" type="button" aria-label="Quick open (Ctrl+K)" title="Quick open (Ctrl+K)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14"/></svg></button>
+          <button class="icon-button is-plain header-open-editor" id="open-in-editor" type="button" aria-label="Open in VS Code editor" title="Open source in editor" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
           <button class="icon-button is-plain header-edit-toggle" id="edit-toggle" type="button" aria-label="Edit page" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.548 20.938h16.9a.75.75 0 0 1 0 1.5H3.548a.75.75 0 0 1 0-1.5ZM18.205 2.295a2.423 2.423 0 0 1 3.426 3.426l-1.38 1.38-3.427-3.426 1.38-1.38Zm-2.44 2.44 3.427 3.427L8.52 18.834a.75.75 0 0 1-.349.197l-4.5 1.273a.75.75 0 0 1-.926-.926l1.273-4.5a.75.75 0 0 1 .197-.349L14.765 4.735Z"/></svg></button>
           <button class="icon-button is-plain header-theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
         </div>
@@ -39,6 +45,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           <div id="tree" class="tree"></div>
         </aside>
         <main class="content-shell">
+          <div id="reading-progress" class="reading-progress" aria-hidden="true"><div id="reading-progress-bar" class="reading-progress-bar"></div></div>
           <div class="page-toolbar">
             <div id="page-search-meta" class="search-meta"></div>
           </div>
@@ -91,6 +98,13 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <aside id="toc" class="toc"></aside>
       </div>
     </div>
+    <div id="palette-overlay" class="palette-overlay" style="display:none">
+      <div class="palette-modal">
+        <input id="palette-input" class="palette-input" type="search" placeholder="Quick open — type a page title" autocomplete="off" />
+        <div id="palette-results" class="palette-results"></div>
+        <div class="palette-hint"><kbd>↑</kbd><kbd>↓</kbd> to navigate · <kbd>Enter</kbd> to open · <kbd>Esc</kbd> to close</div>
+      </div>
+    </div>
     <script async id="mermaid-script" src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   `;
 
@@ -125,6 +139,15 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const themeToggleEl = document.getElementById('theme-toggle');
     const sidebarToggleEl = document.getElementById('sidebar-toggle');
     const editToggleEl = document.getElementById('edit-toggle');
+    const historyBackEl = document.getElementById('history-back');
+    const historyForwardEl = document.getElementById('history-forward');
+    const paletteToggleEl = document.getElementById('palette-toggle');
+    const paletteOverlayEl = document.getElementById('palette-overlay');
+    const paletteInputEl = document.getElementById('palette-input');
+    const paletteResultsEl = document.getElementById('palette-results');
+    const openInEditorEl = document.getElementById('open-in-editor');
+    const brandSubtitleEl = document.getElementById('brand-subtitle');
+    const readingProgressBarEl = document.getElementById('reading-progress-bar');
     const editToolbarEl = document.getElementById('edit-toolbar');
     const editActionsEl = document.getElementById('edit-actions');
     const editStatusEl = document.getElementById('edit-status');
@@ -143,6 +166,11 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     let originalHtml = '';
     let hasUnsavedChanges = false;
     let pasteImageRange = null;
+    let historyStack = [];
+    let historyIndex = -1;
+    let isHistoryNavigation = false;
+    let paletteFilteredPages = [];
+    let paletteSelectedIndex = 0;
 
     // Mermaid initialization — deferred via async script load event to avoid blocking page render
     let mermaidReady = false;
@@ -330,18 +358,145 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       });
     }
 
+    function pushHistory(relativePath) {
+      if (!relativePath || isHistoryNavigation) return;
+      if (historyStack[historyIndex] === relativePath) return;
+      historyStack = historyStack.slice(0, historyIndex + 1);
+      historyStack.push(relativePath);
+      historyIndex = historyStack.length - 1;
+      updateHistoryButtons();
+    }
+
+    function updateHistoryButtons() {
+      if (!historyBackEl || !historyForwardEl) return;
+      historyBackEl.disabled = historyIndex <= 0;
+      historyForwardEl.disabled = historyIndex < 0 || historyIndex >= historyStack.length - 1;
+    }
+
+    function navigateHistory(delta) {
+      const next = historyIndex + delta;
+      if (next < 0 || next >= historyStack.length) return;
+      historyIndex = next;
+      const target = historyStack[historyIndex];
+      isHistoryNavigation = true;
+      vscode.postMessage({ type: 'panel-open-page', relativePath: target });
+      setTimeout(() => { isHistoryNavigation = false; }, 0);
+      updateHistoryButtons();
+    }
+
+    function updateReadingMeta(page) {
+      if (!brandSubtitleEl) return;
+      if (!page) {
+        brandSubtitleEl.textContent = 'Current page';
+        return;
+      }
+      const minutes = page.readingMinutes || 1;
+      const words = page.wordCount || 0;
+      brandSubtitleEl.textContent = words > 0
+        ? minutes + ' min read · ' + words + ' words'
+        : 'Current page';
+    }
+
+    function updateReadingProgress() {
+      if (!readingProgressBarEl) return;
+      const main = contentEl;
+      if (!main) { readingProgressBarEl.style.width = '0%'; return; }
+      const max = main.scrollHeight - main.clientHeight;
+      const ratio = max > 0 ? Math.min(1, Math.max(0, main.scrollTop / max)) : 0;
+      readingProgressBarEl.style.width = (ratio * 100).toFixed(2) + '%';
+    }
+
+    function openPalette() {
+      if (!paletteOverlayEl) return;
+      paletteOverlayEl.style.display = 'flex';
+      paletteInputEl.value = '';
+      paletteSelectedIndex = 0;
+      filterPalette('');
+      setTimeout(() => paletteInputEl.focus(), 0);
+    }
+
+    function closePalette() {
+      if (!paletteOverlayEl) return;
+      paletteOverlayEl.style.display = 'none';
+    }
+
+    function flattenPages(nodes, acc) {
+      if (!nodes) return acc;
+      for (const node of nodes) {
+        if (node.type === 'file') {
+          acc.push({ relativePath: node.relativePath, label: node.label });
+        } else if (node.children) {
+          flattenPages(node.children, acc);
+        }
+      }
+      return acc;
+    }
+
+    function filterPalette(query) {
+      const all = flattenPages(panelState.tree, []);
+      const folded = foldSearchText(query).folded.trim();
+      paletteFilteredPages = !folded
+        ? all.slice(0, 50)
+        : all.filter((page) => foldSearchText(page.label).folded.includes(folded)).slice(0, 50);
+      if (paletteSelectedIndex >= paletteFilteredPages.length) {
+        paletteSelectedIndex = 0;
+      }
+      renderPaletteResults();
+    }
+
+    function renderPaletteResults() {
+      if (!paletteResultsEl) return;
+      if (paletteFilteredPages.length === 0) {
+        paletteResultsEl.innerHTML = '<div class="palette-empty">No matching page</div>';
+        return;
+      }
+      paletteResultsEl.innerHTML = paletteFilteredPages
+        .map((page, idx) => {
+          const cls = idx === paletteSelectedIndex ? 'palette-item is-active' : 'palette-item';
+          return '<div class="' + cls + '" data-idx="' + idx + '">' +
+            '<div class="palette-item-label">' + escapeHtml(page.label) + '</div>' +
+            '<div class="palette-item-path">' + escapeHtml(page.relativePath) + '</div>' +
+            '</div>';
+        })
+        .join('');
+      paletteResultsEl.querySelectorAll('.palette-item').forEach((item) => {
+        item.addEventListener('mouseenter', () => {
+          paletteSelectedIndex = parseInt(item.dataset.idx, 10) || 0;
+          renderPaletteResults();
+        });
+        item.addEventListener('click', () => {
+          paletteOpenSelected();
+        });
+      });
+    }
+
+    function paletteOpenSelected() {
+      const target = paletteFilteredPages[paletteSelectedIndex];
+      if (!target) return;
+      closePalette();
+      vscode.postMessage({ type: 'panel-open-page', relativePath: target.relativePath });
+    }
+
     function renderPage(page, anchor) {
       const previousPath = currentPage ? currentPage.relativePath : null;
       const isSamePage = !!page && page.relativePath === previousPath;
       const preservedScrollTop = isSamePage ? contentEl.scrollTop : 0;
       currentPage = page;
       clearHighlights();
+      updateReadingMeta(page);
+      if (openInEditorEl) {
+        openInEditorEl.style.display = page ? '' : 'none';
+      }
+      if (page) {
+        pushHistory(page.relativePath);
+      }
 
       if (!page) {
         pageWarningsEl.innerHTML = '';
         contentEl.innerHTML = '<div class="empty-state">Select a documentation page to begin.</div>';
         renderToc();
         updatePageSearchUi();
+        updateReadingProgress();
         return;
       }
 
@@ -371,6 +526,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       } else {
         contentEl.scrollTop = 0;
       }
+      updateReadingProgress();
     }
 
     function bindContentLinks() {
@@ -1096,6 +1252,72 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     themeToggleEl.addEventListener('click', () => {
       vscode.postMessage({ type: 'toggle-theme' });
     });
+
+    if (historyBackEl) historyBackEl.addEventListener('click', () => navigateHistory(-1));
+    if (historyForwardEl) historyForwardEl.addEventListener('click', () => navigateHistory(1));
+
+    if (openInEditorEl) {
+      openInEditorEl.addEventListener('click', () => {
+        if (!currentPage) return;
+        vscode.postMessage({ type: 'panel-open-in-editor', relativePath: currentPage.relativePath });
+      });
+    }
+
+    if (paletteToggleEl) paletteToggleEl.addEventListener('click', openPalette);
+
+    if (paletteOverlayEl) {
+      paletteOverlayEl.addEventListener('click', (event) => {
+        if (event.target === paletteOverlayEl) closePalette();
+      });
+    }
+
+    if (paletteInputEl) {
+      paletteInputEl.addEventListener('input', (event) => {
+        paletteSelectedIndex = 0;
+        filterPalette(event.target.value);
+      });
+      paletteInputEl.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          if (paletteFilteredPages.length === 0) return;
+          paletteSelectedIndex = (paletteSelectedIndex + 1) % paletteFilteredPages.length;
+          renderPaletteResults();
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (paletteFilteredPages.length === 0) return;
+          paletteSelectedIndex = (paletteSelectedIndex - 1 + paletteFilteredPages.length) % paletteFilteredPages.length;
+          renderPaletteResults();
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          paletteOpenSelected();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          closePalette();
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        if (paletteOverlayEl && paletteOverlayEl.style.display !== 'none') {
+          closePalette();
+        } else {
+          openPalette();
+        }
+      } else if (event.altKey && event.key === 'ArrowLeft') {
+        event.preventDefault();
+        navigateHistory(-1);
+      } else if (event.altKey && event.key === 'ArrowRight') {
+        event.preventDefault();
+        navigateHistory(1);
+      }
+    });
+
+    contentEl.addEventListener('scroll', () => {
+      updateReadingProgress();
+    }, { passive: true });
+    window.addEventListener('resize', updateReadingProgress);
 
     window.addEventListener('message', (event) => {
       const message = event.data;
@@ -1862,6 +2084,137 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       .doc-article {
         padding: 10px 0 72px;
       }
+    }
+    .header-history {
+      display: flex;
+      gap: 2px;
+      margin-right: 4px;
+    }
+    .header-history-btn {
+      color: #ffffff;
+      width: 26px;
+      height: 26px;
+      padding: 4px;
+    }
+    .header-history-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.16);
+    }
+    .header-history-btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .header-history-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+    .header-palette-toggle,
+    .header-open-editor {
+      color: #ffffff;
+    }
+    .header-palette-toggle:hover,
+    .header-open-editor:hover {
+      background: rgba(255,255,255,0.16);
+    }
+    .header-palette-toggle svg,
+    .header-open-editor svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+    .reading-progress {
+      position: sticky;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: transparent;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .reading-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+      transition: width 0.08s linear;
+    }
+    .palette-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 12vh;
+      z-index: 1000;
+    }
+    .palette-modal {
+      width: min(560px, 90vw);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.32);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 70vh;
+    }
+    .palette-input {
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+      font-size: 15px;
+      background: transparent;
+      color: var(--text);
+      outline: none;
+    }
+    .palette-results {
+      overflow-y: auto;
+      padding: 4px 0;
+      flex: 1;
+    }
+    .palette-empty {
+      padding: 16px;
+      color: var(--text-muted);
+      text-align: center;
+      font-size: 13px;
+    }
+    .palette-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .palette-item.is-active {
+      background: var(--bg-muted);
+    }
+    .palette-item-label {
+      font-size: 14px;
+      color: var(--text);
+    }
+    .palette-item-path {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .palette-hint {
+      padding: 8px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .palette-hint kbd {
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: ui-monospace, monospace;
+      font-size: 10px;
     }
   `;
 

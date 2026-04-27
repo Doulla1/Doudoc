@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.4.0
+
+### Sources et fichiers ad-hoc
+
+- nouveau setting `doudoc.docsPaths` (tableau de chemins relatifs au projet, défaut `["docs"]`) — permet de configurer un ou plusieurs dossiers documentaires
+- support multi-sources : si plusieurs chemins sont configurés, chaque source apparaît comme un groupe de premier niveau dans l'arborescence
+- nouvelle commande **`Doudoc: Open with Doudoc`** disponible en clic droit sur n'importe quel fichier `.md` (depuis l'explorer, l'éditeur ou l'onglet) — l'ouvre dans la `WebviewPanel` même hors des sources configurées
+- watchers indépendants par source documentaire
+
+### Tier 1 — améliorations de lecture
+
+- **navigation back / forward** dans l'en-tête de la `WebviewPanel` (boutons + raccourcis `Alt+←` / `Alt+→`)
+- **palette `Ctrl/Cmd+K`** : quick-open d'une page par son titre, navigation flèches + Enter, Esc pour fermer
+- **barre de progression de lecture** au scroll, sous l'en-tête du panel
+- **bouton "Open in VS Code editor"** dans l'en-tête : ouvre le `.md` source dans l'éditeur natif
+- **détection des liens cassés** au scan : avertissements pour les liens relatifs `*.md` qui pointent vers un fichier inexistant
+- **estimation du temps de lecture** affichée sous le titre du panel (ex. `4 min read · 812 words`)
+
+### Architecture interne
+
+- refactor `DocsRepository` pour supporter plusieurs sources avec préfixage stable des `relativePath` (`<sourceKey>/<inner>`)
+- nouveaux champs `sourceKey`, `sourceRoot`, `wordCount` sur `DocPageRecord`
+- nouveau message typé `panel-open-in-editor`
+- nouvelle fonction `extractRelativeLinks` côté core pour la détection de liens cassés
+
 ## 2.3.1
 
 - correction : le chemin d'une image collée depuis le presse-papier est désormais calculé relativement au dossier de la page courante (et non à la racine `docs/`), ce qui évite l'avertissement "Missing image asset" après sauvegarde lorsque la page se trouve dans un sous-dossier

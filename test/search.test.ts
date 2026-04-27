@@ -11,6 +11,9 @@ const pages: DocPageRecord[] = [
     absolutePath: '/tmp/introduction.md',
     rawMarkdown: '# Introduction',
     plainText: 'This page explains the project setup and first steps.',
+    sourceKey: 'docs',
+    sourceRoot: '/tmp',
+    wordCount: 9,
     headings: [{ id: 'setup', depth: 2, text: 'Setup' }],
   },
   {
@@ -21,6 +24,9 @@ const pages: DocPageRecord[] = [
     absolutePath: '/tmp/api.md',
     rawMarkdown: '# API Reference',
     plainText: 'Methods, payloads and authentication details.',
+    sourceKey: 'docs',
+    sourceRoot: '/tmp',
+    wordCount: 5,
     headings: [{ id: 'authentication', depth: 2, text: 'Authentication' }],
   },
   {
@@ -31,6 +37,9 @@ const pages: DocPageRecord[] = [
     absolutePath: '/tmp/cafe-guide.md',
     rawMarkdown: '# Café Guide',
     plainText: 'Déploiement et résumé des étapes.',
+    sourceKey: 'docs',
+    sourceRoot: '/tmp',
+    wordCount: 5,
     headings: [{ id: 'demarrage', depth: 2, text: 'Démarrage rapide' }],
   },
 ];

@@ -1,6 +1,6 @@
 # Doudoc
 
-Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/docs` and displays it in a modern interface with:
+Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/docs` (or any folder you configure) and displays it in a modern interface with:
 
 - a compact `WebviewView` in the activity bar;
 - a main `WebviewPanel` for reading;
@@ -8,7 +8,22 @@ Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/do
 - in-page search with highlighting;
 - a clickable table of contents;
 - Mermaid diagram rendering in fenced code blocks;
-- support for Markdown relative links and local images.
+- syntax highlighting on code blocks (via highlight.js);
+- support for Markdown relative links and local images;
+- back / forward navigation history (`Alt+←` / `Alt+→`);
+- quick-open palette (`Ctrl/Cmd+K`) to jump to any page by title;
+- reading progress bar and estimated reading time;
+- in-place WYSIWYG editing with paste-image, conflict detection, autosave-friendly toolbar.
+
+## Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `doudoc.docsPaths` | `["docs"]` | Array of folder paths (relative to the workspace root) scanned by Doudoc as documentation sources. Configure several to expose multiple knowledge bases. |
+
+## Open any Markdown file
+
+Right-click a `.md` file in the explorer, in the editor, or on its tab and pick **Open with Doudoc** to read it in the panel — even if it lives outside your configured `docsPaths`.
 
 ## Pre-publication
 

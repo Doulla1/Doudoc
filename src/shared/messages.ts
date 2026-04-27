@@ -15,7 +15,8 @@ export type PanelToHostMessage =
   | { type: 'panel-enter-edit' }
   | { type: 'panel-save-page'; markdown: string }
   | { type: 'panel-cancel-edit' }
-  | { type: 'panel-paste-image'; dataUrl: string };
+  | { type: 'panel-paste-image'; dataUrl: string }
+  | { type: 'panel-open-in-editor'; relativePath: string };
 
 export type HostToExplorerMessage =
   | {

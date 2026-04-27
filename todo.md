@@ -125,6 +125,42 @@
 - [ ] Ajouter la stratégie d'enregistrement, d'annulation et de retour arrière
 - [ ] Tester les cas de conflits potentiels avec des modifications externes
 
+## Phase 13 - Sources configurables et fichiers ad-hoc
+
+- [x] Setting `doudoc.docsPaths` : tableau de chemins relatifs au projet (défaut `["docs"]`)
+- [x] `DocsRepository` multi-sources avec préfixage stable des `relativePath`
+- [x] Tree top-level groupé par source si plusieurs sources
+- [x] Watchers indépendants par source
+- [x] Commande `doudoc.openMarkdownFile` pour ouvrir n'importe quel `.md` dans Doudoc
+- [x] Entrée de menu contextuel "Open with Doudoc" dans l'explorer et l'éditeur
+
+## Phase 14 - Tier 1 (impact fort, coût faible)
+
+- [x] Navigation back/forward dans la `WebviewPanel` (historique client)
+- [x] Palette `Cmd/Ctrl+K` pour ouvrir une page par son titre
+- [x] Barre de progression de lecture au scroll
+- [x] Bouton "Ouvrir dans l'éditeur VS Code" (commande `vscode.open`)
+- [x] Détection des liens relatifs cassés au scan (warnings)
+- [x] Estimation du temps de lecture sous le titre
+
+## Phase 15 - Tier 2 (impact fort, coût moyen)
+
+- [ ] Front matter YAML (titre, tags, description, date)
+- [ ] Backlinks dans la sidebar droite (pages qui citent la page courante)
+- [ ] Recherche fuzzy avec tolérance aux fautes
+- [ ] Auto-save en mode édition (debounce 2s, paramétrable)
+- [ ] Création de nouvelle page depuis l'UI (bouton `+`)
+- [ ] Pages récemment visitées (5–10 dernières dans la sidebar)
+
+## Phase 16 - Tier 3 (nouvelles dimensions)
+
+- [ ] Mode focus (Zen Mode) — masquer les sidebars, contenu centré
+- [ ] Export PDF / impression avec feuille `@media print`
+- [ ] Date de dernière modification via `git log`
+- [ ] Quick-pick VS Code pour rechercher dans les docs (`Cmd/Ctrl+P`)
+- [ ] Support multi-root workspace
+- [ ] Settings : `doudoc.defaultTheme`, `doudoc.readingWidth`, `doudoc.autoSave`
+
 ## Questions à trancher
 
 - [ ] Aucune question bloquante pour lancer l'implémentation

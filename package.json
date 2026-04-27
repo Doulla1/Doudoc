@@ -2,7 +2,7 @@
   "name": "doudoc",
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "publisher": "Doudou",
   "license": "MIT",
   "repository": {
@@ -41,11 +41,23 @@
   "activationEvents": [
     "onView:doudoc.explorerView",
     "onCommand:doudoc.openPanel",
-    "onCommand:doudoc.refresh"
+    "onCommand:doudoc.refresh",
+    "onCommand:doudoc.openMarkdownFile"
   ],
   "main": "./dist/extension.js",
   "icon": "media/logo.png",
   "contributes": {
+    "configuration": {
+      "title": "Doudoc",
+      "properties": {
+        "doudoc.docsPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["docs"],
+          "description": "List of folder paths (relative to the workspace root) scanned by Doudoc as documentation sources. Defaults to a single 'docs' folder."
+        }
+      }
+    },
     "commands": [
       {
         "command": "doudoc.openPanel",
@@ -56,6 +68,11 @@
         "command": "doudoc.refresh",
         "title": "Doudoc: Refresh Documentation",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "doudoc.openMarkdownFile",
+        "title": "Open with Doudoc",
+        "icon": "$(book)"
       }
     ],
     "viewsContainers": {
@@ -87,6 +104,27 @@
           "command": "doudoc.refresh",
           "when": "view == doudoc.explorerView",
           "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "doudoc.openMarkdownFile",
+          "when": "resourceExtname == .md",
+          "group": "navigation@10"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "doudoc.openMarkdownFile",
+          "when": "resourceExtname == .md",
+          "group": "navigation@10"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "doudoc.openMarkdownFile",
+          "when": "resourceExtname == .md",
+          "group": "navigation@10"
         }
       ]
     }
