@@ -1366,25 +1366,26 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     .shell-header {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 0 16px;
+      gap: 12px;
+      padding: 0 14px;
       background: var(--header-bg);
       color: var(--text);
       border-bottom: 1px solid var(--border);
-      height: 52px;
+      height: 56px;
       backdrop-filter: saturate(140%) blur(8px);
     }
     .header-brand {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       min-width: 0;
-      width: 180px;
       flex-shrink: 0;
     }
     .header-search {
-      flex: 0 1 240px;
-      min-width: 80px;
+      flex: 1 1 auto;
+      min-width: 120px;
+      max-width: 360px;
+      margin-left: auto;
     }
     .header-search-input {
       background: var(--bg-muted);
@@ -1453,20 +1454,32 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       place-items: center;
       font-weight: 700;
       font-size: 12px;
-      color: #ffffff;
-      background: rgba(255,255,255,0.14);
-      border: 1px solid rgba(255,255,255,0.18);
+      color: var(--accent-strong);
+      background: var(--accent-soft);
+      border: 1px solid var(--border);
     }
     .brand-copy {
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      line-height: 1.15;
+      padding-left: 4px;
     }
     .brand-title {
       font-size: 13px;
       font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.005em;
     }
     .brand-subtitle {
-      color: rgba(255,255,255,0.72);
+      color: var(--text-muted);
       font-size: 11px;
+      margin-top: 1px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 240px;
     }
     .sidebar-heading {
       display: flex;
@@ -2082,6 +2095,19 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       display: flex;
       gap: 2px;
       margin-right: 4px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .header-actions .icon-button,
+    .header-history .icon-button {
+      width: 30px;
+      height: 30px;
+      padding: 5px;
+      border-radius: var(--radius-sm);
     }
     .header-history-btn {
       color: var(--text-muted);

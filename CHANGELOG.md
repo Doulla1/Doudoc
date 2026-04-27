@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.0.1
+
+### Correctifs barre supérieure
+
+- titre `Documentation` et sous-titre de page n'héritaient plus du fond teinté supprimé en v3.0.0 — ils sont désormais lisibles sur le fond neutre (couleur `--text` / `--text-muted`)
+- hauteur de l'en-tête passée de 52px à 56px pour éviter la troncature verticale du titre stacké
+- champ de recherche dans la page (`Find in current page`) repoussé à droite via `margin-left: auto`, plus large (jusqu'à 360px) et ne se retrouve plus coincé entre la marque et les actions
+- boutons d'action et d'historique uniformisés (30×30px, même radius, gap réduit pour un cluster compact)
+- `brand-mark` (carré du logo) repris avec les tokens `accent-soft` au lieu de blancs hérités
+- sous-titre de page tronqué par ellipse au lieu de pousser la mise en page
+
 ## 3.0.0
 
 ### Refonte du design (Phase 16.D)
