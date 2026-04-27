@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.3.0
+
+### Toggle de la table des matières (TOC)
+
+- Nouveau bouton **TOC** (icône liste) dans le header, à gauche du bouton `+`.
+- Un clic masque ou affiche la colonne TOC droite (transition CSS `grid-template-columns` 160 ms).
+- État persisté dans `vscode.setState` (`isTocOpen`) — restauré à la réouverture du panneau.
+- Bouton visuellement actif (fond mis en évidence) quand la TOC est masquée.
+- Compatible avec le toggle de sidebar gauche : les deux colonnes peuvent être masquées simultanément.
+- Masqué en zen mode (la TOC est déjà cachée par `[data-zen=on]`).
+
 ## 3.2.0
 
 ### Refonte du mode édition (tableaux, code, listes)
