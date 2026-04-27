@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.2.0
+
+### Refonte du mode édition (tableaux, code, listes)
+
+- **Tableaux** : l'insertion crée désormais un vrai bloc `<div class="doc-table-wrap"><table>` au niveau racine de l'article (sortie automatique du paragraphe courant), avec cellules vides et éditables. Le bug de sérialisation qui produisait `Header 1Header 2…CellCell` sur une seule ligne est corrigé : `processBlocks` détecte les blocs imbriqués dans un `<p>` et les promeut, et l'insertion garantit que le tableau n'est plus enfant d'un paragraphe.
+- **Navigation tableau** : `Tab` / `Shift+Tab` déplace le curseur vers la cellule suivante / précédente. `Tab` sur la dernière cellule ajoute automatiquement une nouvelle ligne. Cellule active mise en évidence (outline accent).
+- **Bloc de code** : la modale "Insert code block" propose un sélecteur de langage (`datalist` avec ~35 langages courants : `javascript`, `typescript`, `python`, `bash`, `json`, `mermaid`, `sql`, …) et un champ multiline pour coller / saisir le code. Le bloc est inséré comme `<div class="code-block" data-lang="…"><pre><code class="language-…">…</code></pre></div>`, avec étiquette de langage non-éditable. `Enter` à l'intérieur d'un bloc de code insère un saut de ligne, plus un nouveau paragraphe.
+- **Listes de tâches** : structure améliorée (`<input type="checkbox" contenteditable="false"> <span class="task-list-text">…</span>`). `Enter` dans un item duplique correctement la case à cocher pour le nouvel item ; `Enter` sur un item vide sort de la liste vers un paragraphe.
+- **Modale d'insertion** : le helper `showInsertDialog` accepte maintenant des champs `multiline` (textarea) et `list` (datalist) ; `Cmd/Ctrl+Enter` valide les textareas, `Enter` valide les inputs simples.
+- **Raccourcis clavier** dans le contenu éditable : `Ctrl/Cmd+B` (gras), `Ctrl/Cmd+I` (italique), `Ctrl/Cmd+K` (lien), `Ctrl/Cmd+Shift+C` (bloc de code), `Ctrl/Cmd+S` (save).
+
 ## 3.1.1
 
 ### Retrait de l'export PDF

@@ -1,3 +1,27 @@
+# Todo — v3.2.0 : refonte mode édition (tableaux, code block, listes)
+
+**Début** : 2026-04-27 19:59
+**Fin** : 2026-04-27 20:06
+
+## Tâches
+
+- [x] Fix sérialisation tableau (insertion hors `<p>` + processBlocks défensif)
+- [x] Modal "Insert code block" avec sélecteur de langage (datalist) + zone code
+- [x] Modal `showInsertDialog` : support `list` (datalist) et `multiline` (textarea)
+- [x] Insert blocs : helper `insertBlockAtCursor` qui sort des `<p>`/`<li>`
+- [x] Tableau wrappé dans `.doc-table-wrap`, cellules vides éditables
+- [x] Task list : item structuré `<input>` + `.task-list-text`
+- [x] Enter dans task-list : nouvelle case à cocher (sortie de liste si vide)
+- [x] Tab / Shift+Tab dans tableau : navigation entre cellules + ajout de ligne
+- [x] Raccourcis Ctrl/Cmd+B, +I, +K (lien), +Shift+C (code block)
+- [ ] ~~Autoformat Markdown (`# `, `- `, `1. `, `> `, `[] `)~~ — différé (complexité élevée, hors scope critique)
+- [x] Polissage CSS toolbar + table en édition (focus cell, code-block-lang)
+- [x] Mettre à jour les tests (28/28 verts)
+- [x] Mettre à jour la documentation (CHANGELOG + guide editorMode)
+- [x] Bump version 3.2.0
+
+---
+
 # Todo — v3.1.1 : retrait export PDF
 
 **Début** : 2026-04-27 19:42

@@ -740,34 +740,98 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       }
     }
 
-    function insertTaskList() {
-      const ul = document.createElement('ul');
-      ul.className = 'task-list';
+    /* ── Edit helpers (block insertion, caret) ── */
+
+    const COMMON_LANGS = ['text', 'javascript', 'typescript', 'tsx', 'jsx', 'python', 'bash', 'shell',
+      'json', 'yaml', 'html', 'css', 'scss', 'sass', 'sql', 'php', 'java', 'kotlin', 'rust', 'go',
+      'c', 'cpp', 'csharp', 'ruby', 'swift', 'markdown', 'mermaid', 'diff', 'xml', 'dockerfile',
+      'toml', 'ini', 'graphql', 'lua', 'r', 'scala', 'powershell', 'plaintext'];
+
+    function getEditableArticle() {
+      return contentEl.querySelector('.doc-article');
+    }
+
+    function getCurrentTopLevelBlock(article) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+      while (node && node !== article) {
+        if (node.parentNode === article) return node;
+        node = node.parentNode;
+      }
+      return null;
+    }
+
+    function placeCaretIn(node, atEnd) {
+      if (!node) return;
+      const sel = window.getSelection();
+      if (!sel) return;
+      const r = document.createRange();
+      r.selectNodeContents(node);
+      r.collapse(!atEnd);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+
+    function isBlockEmpty(el) {
+      if (!el) return true;
+      const html = el.innerHTML.trim();
+      return html === '' || html === '<br>' || html === '<br/>';
+    }
+
+    function ensureTrailingParagraph(block) {
+      const next = block.nextElementSibling;
+      if (next && next.tagName === 'P') return;
+      const p = document.createElement('p');
+      p.appendChild(document.createElement('br'));
+      block.after(p);
+    }
+
+    function insertBlockAtCursor(block) {
+      const article = getEditableArticle();
+      if (!article) return null;
+      const target = getCurrentTopLevelBlock(article);
+      if (target) {
+        if (target.tagName === 'P' && isBlockEmpty(target)) {
+          target.replaceWith(block);
+        } else {
+          target.after(block);
+        }
+      } else {
+        article.appendChild(block);
+      }
+      ensureTrailingParagraph(block);
+      hasUnsavedChanges = true;
+      return block;
+    }
+
+    function buildTaskItem(text) {
       const li = document.createElement('li');
       li.className = 'task-list-item';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.className = 'task-list-checkbox';
       cb.contentEditable = 'false';
+      const span = document.createElement('span');
+      span.className = 'task-list-text';
+      if (text) span.textContent = text;
       li.appendChild(cb);
-      li.appendChild(document.createTextNode(' Task'));
+      li.appendChild(document.createTextNode(' '));
+      li.appendChild(span);
+      return li;
+    }
+
+    function insertTaskList() {
+      const ul = document.createElement('ul');
+      ul.className = 'task-list contains-task-list';
+      const li = buildTaskItem('');
       ul.appendChild(li);
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount) {
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        range.insertNode(ul);
-        range.setStartAfter(ul);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+      insertBlockAtCursor(ul);
+      placeCaretIn(li.querySelector('.task-list-text'));
     }
 
     function promptInsertTable() {
-      const sel = window.getSelection();
-      let savedRange = null;
-      if (sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
       showInsertDialog('Insert table', [
         { name: 'cols', label: 'Columns', placeholder: '3', value: '3' },
         { name: 'rows', label: 'Rows (excluding header)', placeholder: '2', value: '2' },
@@ -775,6 +839,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         if (!data) return;
         const cols = Math.max(1, Math.min(12, parseInt(data.cols, 10) || 3));
         const rows = Math.max(1, Math.min(50, parseInt(data.rows, 10) || 2));
+        const wrap = document.createElement('div');
+        wrap.className = 'doc-table-wrap';
         const table = document.createElement('table');
         const thead = document.createElement('thead');
         const headRow = document.createElement('tr');
@@ -790,27 +856,16 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           const tr = document.createElement('tr');
           for (let c = 0; c < cols; c++) {
             const td = document.createElement('td');
-            td.textContent = 'Cell';
+            td.innerHTML = '<br>';
             tr.appendChild(td);
           }
           tbody.appendChild(tr);
         }
         table.appendChild(tbody);
-        if (savedRange) {
-          const s = window.getSelection();
-          s.removeAllRanges();
-          s.addRange(savedRange);
-          savedRange.deleteContents();
-          savedRange.insertNode(table);
-          // Place caret in first header cell.
-          const firstTh = table.querySelector('th');
-          if (firstTh) {
-            const r = document.createRange();
-            r.selectNodeContents(firstTh);
-            s.removeAllRanges();
-            s.addRange(r);
-          }
-        }
+        wrap.appendChild(table);
+        insertBlockAtCursor(wrap);
+        const firstTh = table.querySelector('th');
+        if (firstTh) placeCaretIn(firstTh, true);
       });
     }
 
@@ -822,7 +877,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       try {
         range.surroundContents(el);
       } catch {
-        el.textContent = sel.toString();
+        el.textContent = sel.toString() || ' ';
         range.deleteContents();
         range.insertNode(el);
       }
@@ -831,38 +886,74 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       r.selectNodeContents(el);
       r.collapse(false);
       sel.addRange(r);
+      hasUnsavedChanges = true;
     }
 
     function insertCodeBlock() {
       const sel = window.getSelection();
-      const text = sel?.toString() || 'code';
-      const pre = document.createElement('pre');
-      const code = document.createElement('code');
-      code.textContent = text;
-      pre.appendChild(code);
-      if (sel && sel.rangeCount) {
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        range.insertNode(pre);
-        range.setStartAfter(pre);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+      const selectedText = sel ? sel.toString() : '';
+      showInsertDialog('Insert code block', [
+        { name: 'lang', label: 'Language', placeholder: 'e.g. javascript', value: '', list: COMMON_LANGS },
+        { name: 'code', label: 'Code', placeholder: 'Paste or type code…', value: selectedText, multiline: true },
+      ]).then(function(data) {
+        if (!data) return;
+        const langInput = (data.lang || '').trim().toLowerCase();
+        const lang = langInput || 'text';
+        const code = (data.code || '').replace(/\\n+$/, '');
+        const wrap = document.createElement('div');
+        wrap.className = 'code-block';
+        wrap.setAttribute('data-lang', lang);
+        if (lang && lang !== 'text') {
+          const label = document.createElement('span');
+          label.className = 'code-block-lang';
+          label.contentEditable = 'false';
+          label.textContent = lang;
+          wrap.appendChild(label);
+        }
+        const pre = document.createElement('pre');
+        const codeEl = document.createElement('code');
+        if (lang && lang !== 'text') codeEl.className = 'language-' + lang;
+        codeEl.textContent = code || ' ';
+        pre.appendChild(codeEl);
+        wrap.appendChild(pre);
+        insertBlockAtCursor(wrap);
+        placeCaretIn(codeEl, true);
+      });
     }
 
     function showInsertDialog(title, fields) {
       return new Promise(function(resolve) {
         insertDialogTitleEl.textContent = title;
-        insertDialogFieldsEl.innerHTML = fields.map(function(f) {
-          return '<label class="insert-dialog-label">' + escapeHtml(f.label) +
+        var dataListsHtml = '';
+        var fieldsHtml = fields.map(function(f, idx) {
+          var name = escapeHtml(f.name);
+          var label = escapeHtml(f.label);
+          var placeholder = escapeHtml(f.placeholder || '');
+          var value = escapeHtml(f.value || '');
+          if (f.multiline) {
+            return '<label class="insert-dialog-label">' + label +
+              '<textarea class="insert-dialog-input insert-dialog-textarea" data-field="' +
+              name + '" placeholder="' + placeholder + '" rows="6">' + value + '</textarea></label>';
+          }
+          var listAttr = '';
+          if (f.list && f.list.length) {
+            var listId = 'doudoc-datalist-' + idx;
+            listAttr = ' list="' + listId + '"';
+            dataListsHtml += '<datalist id="' + listId + '">' +
+              f.list.map(function(opt) { return '<option value="' + escapeHtml(opt) + '"></option>'; }).join('') +
+              '</datalist>';
+          }
+          return '<label class="insert-dialog-label">' + label +
             '<input class="insert-dialog-input search-input" type="text" data-field="' +
-            escapeHtml(f.name) + '" placeholder="' + escapeHtml(f.placeholder || '') +
-            '" value="' + escapeHtml(f.value || '') + '" /></label>';
+            name + '" placeholder="' + placeholder + '" value="' + value + '"' + listAttr + ' autocomplete="off" /></label>';
         }).join('');
+        insertDialogFieldsEl.innerHTML = fieldsHtml + dataListsHtml;
         insertDialogEl.style.display = '';
-        var firstInput = insertDialogFieldsEl.querySelector('input');
-        if (firstInput) firstInput.focus();
+        var firstInput = insertDialogFieldsEl.querySelector('input, textarea');
+        if (firstInput) {
+          firstInput.focus();
+          if (firstInput.tagName === 'INPUT') firstInput.select();
+        }
         insertDialogResolve = resolve;
       });
     }
@@ -876,7 +967,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
 
     insertDialogOkEl.addEventListener('click', function() {
-      var inputs = insertDialogFieldsEl.querySelectorAll('input[data-field]');
+      var inputs = insertDialogFieldsEl.querySelectorAll('input[data-field], textarea[data-field]');
       var data = {};
       inputs.forEach(function(input) { data[input.dataset.field] = input.value; });
       closeInsertDialog(data);
@@ -887,7 +978,10 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     });
 
     insertDialogEl.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        insertDialogOkEl.click();
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.tagName === 'TEXTAREA') {
         e.preventDefault();
         insertDialogOkEl.click();
       }
@@ -985,6 +1079,19 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
             break;
           }
           case 'p': {
+            // Defensive: if a block-level element ended up nested inside a <p>
+            // (can happen when contenteditable inserts a table/pre/list inside the
+            // current paragraph), promote those nested blocks instead of flattening.
+            const hasNestedBlock = Array.from(child.children).some((c) => {
+              const t = c.tagName.toLowerCase();
+              return t === 'table' || t === 'pre' || t === 'ul' || t === 'ol' ||
+                t === 'blockquote' || t === 'hr' || t === 'div' ||
+                /^h[1-6]$/.test(t);
+            });
+            if (hasNestedBlock) {
+              md += processBlocks(child);
+              break;
+            }
             const text = inlineContent(child);
             if (text.trim()) md += text + '\\n\\n';
             break;
@@ -1260,11 +1367,119 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
 
     contentEl.addEventListener('keydown', function(e) {
       if (!isEditMode) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      handleEditorKeydown(e);
+    });
+
+    function getElementContext(node) {
+      if (!node) return { li: null, taskItem: null, cell: null, table: null, codeBlock: null };
+      const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      if (!el) return { li: null, taskItem: null, cell: null, table: null, codeBlock: null };
+      const li = el.closest('li');
+      const cell = el.closest('td, th');
+      const table = el.closest('table');
+      const codeBlock = el.closest('.code-block, pre');
+      const taskItem = li && li.classList.contains('task-list-item') ? li : null;
+      return { li, taskItem, cell, table, codeBlock };
+    }
+
+    function handleEditorKeydown(e) {
+      // Save shortcut
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 's') {
         e.preventDefault();
         saveEdit();
+        return;
       }
-    });
+      // Inline formatting + dialogs shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        const k = e.key.toLowerCase();
+        if (!e.shiftKey && k === 'b') { e.preventDefault(); document.execCommand('bold'); return; }
+        if (!e.shiftKey && k === 'i') { e.preventDefault(); document.execCommand('italic'); return; }
+        if (!e.shiftKey && k === 'k') { e.preventDefault(); promptInsertLink(); return; }
+        if (e.shiftKey && k === 'c') { e.preventDefault(); insertCodeBlock(); return; }
+      }
+
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const ctx = getElementContext(sel.anchorNode);
+
+      // Tab / Shift+Tab inside table cell — navigate / add row
+      if (ctx.cell && e.key === 'Tab') {
+        e.preventDefault();
+        moveTableCellFocus(ctx.cell, e.shiftKey ? -1 : 1);
+        return;
+      }
+
+      // Enter inside a code block (<pre><code>) — insert literal newline, not a paragraph
+      if (ctx.codeBlock && e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.execCommand('insertLineBreak');
+        return;
+      }
+
+      // Enter inside task-list item — replicate checkbox or exit list when empty
+      if (ctx.taskItem && e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // Compute "empty" by ignoring the leading checkbox.
+        const textOnly = Array.from(ctx.taskItem.childNodes)
+          .filter((n) => !(n.nodeType === Node.ELEMENT_NODE && n.tagName === 'INPUT'))
+          .map((n) => n.textContent || '')
+          .join('');
+        const empty = !textOnly.trim();
+        if (empty) {
+          const ul = ctx.taskItem.closest('ul');
+          if (ul) {
+            const p = document.createElement('p');
+            p.appendChild(document.createElement('br'));
+            ul.after(p);
+            ctx.taskItem.remove();
+            if (!ul.querySelector('li')) ul.remove();
+            placeCaretIn(p);
+          }
+        } else {
+          const newLi = buildTaskItem('');
+          ctx.taskItem.after(newLi);
+          placeCaretIn(newLi.querySelector('.task-list-text'));
+        }
+        hasUnsavedChanges = true;
+        return;
+      }
+
+      // Enter inside an empty regular list item — exit the list (browser behaviour is OK
+      // for ul/ol but a fresh task-list-text span gets stripped, so we already handled
+      // the task case above). Nothing more to do here.
+    }
+
+    function moveTableCellFocus(currentCell, direction) {
+      const row = currentCell.parentElement;
+      if (!row) return;
+      const cells = Array.from(row.querySelectorAll('td, th'));
+      const idx = cells.indexOf(currentCell);
+      if (idx + direction >= 0 && idx + direction < cells.length) {
+        placeCaretIn(cells[idx + direction], direction < 0);
+        return;
+      }
+      const table = currentCell.closest('table');
+      if (!table) return;
+      const allRows = Array.from(table.querySelectorAll('tr'));
+      const rowIdx = allRows.indexOf(row);
+      const targetRow = allRows[rowIdx + direction];
+      if (targetRow) {
+        const targetCells = Array.from(targetRow.querySelectorAll('td, th'));
+        const target = direction > 0 ? targetCells[0] : targetCells[targetCells.length - 1];
+        if (target) placeCaretIn(target, direction < 0);
+      } else if (direction > 0) {
+        const tbody = table.querySelector('tbody') || table;
+        const newRow = document.createElement('tr');
+        for (let i = 0; i < cells.length; i++) {
+          const td = document.createElement('td');
+          td.innerHTML = '<br>';
+          newRow.appendChild(td);
+        }
+        tbody.appendChild(newRow);
+        placeCaretIn(newRow.querySelector('td'));
+        hasUnsavedChanges = true;
+      }
+    }
 
     globalSearchEl.addEventListener('input', (event) => {
       vscode.postMessage({ type: 'panel-search', query: event.target.value });
@@ -2089,6 +2304,44 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
     .doc-article.is-editing > :first-child {
       margin-top: 0;
+    }
+    .doc-article.is-editing .doc-table-wrap {
+      overflow: visible;
+    }
+    .doc-article.is-editing td,
+    .doc-article.is-editing th {
+      min-width: 60px;
+      cursor: text;
+    }
+    .doc-article.is-editing td:focus,
+    .doc-article.is-editing th:focus,
+    .doc-article.is-editing td:focus-within,
+    .doc-article.is-editing th:focus-within {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      background: var(--accent-soft);
+    }
+    .doc-article.is-editing .code-block {
+      position: relative;
+    }
+    .doc-article.is-editing .code-block .code-copy-btn {
+      display: none;
+    }
+    .doc-article.is-editing .code-block-lang {
+      user-select: none;
+    }
+    .doc-article.is-editing pre {
+      cursor: text;
+    }
+    .doc-article.is-editing .task-list-text:empty::before {
+      content: '\\200b';
+    }
+    .insert-dialog-textarea {
+      font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+      font-size: 12.5px;
+      line-height: 1.45;
+      resize: vertical;
+      min-height: 110px;
     }
     .insert-dialog {
       position: absolute;
