@@ -26,7 +26,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           <button id="cancel-btn" class="edit-action-btn cancel-btn" type="button">Cancel</button>
         </div>
         <div class="header-actions">
-          <button class="icon-button is-plain header-palette-toggle" id="palette-toggle" type="button" aria-label="Quick open (Ctrl+K)" title="Quick open (Ctrl+K)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14"/></svg></button>
           <button class="icon-button is-plain header-open-editor" id="open-in-editor" type="button" aria-label="Open in VS Code editor" title="Open source in editor" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
           <button class="icon-button is-plain header-edit-toggle" id="edit-toggle" type="button" aria-label="Edit page" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.548 20.938h16.9a.75.75 0 0 1 0 1.5H3.548a.75.75 0 0 1 0-1.5ZM18.205 2.295a2.423 2.423 0 0 1 3.426 3.426l-1.38 1.38-3.427-3.426 1.38-1.38Zm-2.44 2.44 3.427 3.427L8.52 18.834a.75.75 0 0 1-.349.197l-4.5 1.273a.75.75 0 0 1-.926-.926l1.273-4.5a.75.75 0 0 1 .197-.349L14.765 4.735Z"/></svg></button>
           <button class="icon-button is-plain header-theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
@@ -98,13 +97,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <aside id="toc" class="toc"></aside>
       </div>
     </div>
-    <div id="palette-overlay" class="palette-overlay" style="display:none">
-      <div class="palette-modal">
-        <input id="palette-input" class="palette-input" type="search" placeholder="Quick open — type a page title" autocomplete="off" />
-        <div id="palette-results" class="palette-results"></div>
-        <div class="palette-hint"><kbd>↑</kbd><kbd>↓</kbd> to navigate · <kbd>Enter</kbd> to open · <kbd>Esc</kbd> to close</div>
-      </div>
-    </div>
     <script async id="mermaid-script" src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   `;
 
@@ -141,10 +133,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const editToggleEl = document.getElementById('edit-toggle');
     const historyBackEl = document.getElementById('history-back');
     const historyForwardEl = document.getElementById('history-forward');
-    const paletteToggleEl = document.getElementById('palette-toggle');
-    const paletteOverlayEl = document.getElementById('palette-overlay');
-    const paletteInputEl = document.getElementById('palette-input');
-    const paletteResultsEl = document.getElementById('palette-results');
     const openInEditorEl = document.getElementById('open-in-editor');
     const brandSubtitleEl = document.getElementById('brand-subtitle');
     const readingProgressBarEl = document.getElementById('reading-progress-bar');
@@ -169,8 +157,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     let historyStack = [];
     let historyIndex = -1;
     let isHistoryNavigation = false;
-    let paletteFilteredPages = [];
-    let paletteSelectedIndex = 0;
 
     // Mermaid initialization — deferred via async script load event to avoid blocking page render
     let mermaidReady = false;
@@ -391,10 +377,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         return;
       }
       const minutes = page.readingMinutes || 1;
-      const words = page.wordCount || 0;
-      brandSubtitleEl.textContent = words > 0
-        ? minutes + ' min read · ' + words + ' words'
-        : 'Current page';
+      brandSubtitleEl.textContent = minutes + ' min read';
     }
 
     function updateReadingProgress() {
@@ -404,77 +387,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       const max = main.scrollHeight - main.clientHeight;
       const ratio = max > 0 ? Math.min(1, Math.max(0, main.scrollTop / max)) : 0;
       readingProgressBarEl.style.width = (ratio * 100).toFixed(2) + '%';
-    }
-
-    function openPalette() {
-      if (!paletteOverlayEl) return;
-      paletteOverlayEl.style.display = 'flex';
-      paletteInputEl.value = '';
-      paletteSelectedIndex = 0;
-      filterPalette('');
-      setTimeout(() => paletteInputEl.focus(), 0);
-    }
-
-    function closePalette() {
-      if (!paletteOverlayEl) return;
-      paletteOverlayEl.style.display = 'none';
-    }
-
-    function flattenPages(nodes, acc) {
-      if (!nodes) return acc;
-      for (const node of nodes) {
-        if (node.type === 'file') {
-          acc.push({ relativePath: node.relativePath, label: node.label });
-        } else if (node.children) {
-          flattenPages(node.children, acc);
-        }
-      }
-      return acc;
-    }
-
-    function filterPalette(query) {
-      const all = flattenPages(panelState.tree, []);
-      const folded = foldSearchText(query).folded.trim();
-      paletteFilteredPages = !folded
-        ? all.slice(0, 50)
-        : all.filter((page) => foldSearchText(page.label).folded.includes(folded)).slice(0, 50);
-      if (paletteSelectedIndex >= paletteFilteredPages.length) {
-        paletteSelectedIndex = 0;
-      }
-      renderPaletteResults();
-    }
-
-    function renderPaletteResults() {
-      if (!paletteResultsEl) return;
-      if (paletteFilteredPages.length === 0) {
-        paletteResultsEl.innerHTML = '<div class="palette-empty">No matching page</div>';
-        return;
-      }
-      paletteResultsEl.innerHTML = paletteFilteredPages
-        .map((page, idx) => {
-          const cls = idx === paletteSelectedIndex ? 'palette-item is-active' : 'palette-item';
-          return '<div class="' + cls + '" data-idx="' + idx + '">' +
-            '<div class="palette-item-label">' + escapeHtml(page.label) + '</div>' +
-            '<div class="palette-item-path">' + escapeHtml(page.relativePath) + '</div>' +
-            '</div>';
-        })
-        .join('');
-      paletteResultsEl.querySelectorAll('.palette-item').forEach((item) => {
-        item.addEventListener('mouseenter', () => {
-          paletteSelectedIndex = parseInt(item.dataset.idx, 10) || 0;
-          renderPaletteResults();
-        });
-        item.addEventListener('click', () => {
-          paletteOpenSelected();
-        });
-      });
-    }
-
-    function paletteOpenSelected() {
-      const target = paletteFilteredPages[paletteSelectedIndex];
-      if (!target) return;
-      closePalette();
-      vscode.postMessage({ type: 'panel-open-page', relativePath: target.relativePath });
     }
 
     function renderPage(page, anchor) {
@@ -1263,47 +1175,16 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       });
     }
 
-    if (paletteToggleEl) paletteToggleEl.addEventListener('click', openPalette);
-
-    if (paletteOverlayEl) {
-      paletteOverlayEl.addEventListener('click', (event) => {
-        if (event.target === paletteOverlayEl) closePalette();
-      });
-    }
-
-    if (paletteInputEl) {
-      paletteInputEl.addEventListener('input', (event) => {
-        paletteSelectedIndex = 0;
-        filterPalette(event.target.value);
-      });
-      paletteInputEl.addEventListener('keydown', (event) => {
-        if (event.key === 'ArrowDown') {
-          event.preventDefault();
-          if (paletteFilteredPages.length === 0) return;
-          paletteSelectedIndex = (paletteSelectedIndex + 1) % paletteFilteredPages.length;
-          renderPaletteResults();
-        } else if (event.key === 'ArrowUp') {
-          event.preventDefault();
-          if (paletteFilteredPages.length === 0) return;
-          paletteSelectedIndex = (paletteSelectedIndex - 1 + paletteFilteredPages.length) % paletteFilteredPages.length;
-          renderPaletteResults();
-        } else if (event.key === 'Enter') {
-          event.preventDefault();
-          paletteOpenSelected();
-        } else if (event.key === 'Escape') {
-          event.preventDefault();
-          closePalette();
-        }
-      });
-    }
-
     document.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        if (paletteOverlayEl && paletteOverlayEl.style.display !== 'none') {
-          closePalette();
-        } else {
-          openPalette();
+        if (!isSidebarOpen) {
+          isSidebarOpen = true;
+          renderSidebarToggle();
+        }
+        if (globalSearchEl) {
+          globalSearchEl.focus();
+          globalSearchEl.select();
         }
       } else if (event.altKey && event.key === 'ArrowLeft') {
         event.preventDefault();
@@ -1427,8 +1308,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       flex-shrink: 0;
     }
     .header-search {
-      flex: 1;
-      min-width: 0;
+      flex: 0 1 200px;
+      min-width: 80px;
     }
     .header-search-input {
       background: rgba(255,255,255,0.96);
@@ -2108,15 +1989,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       height: 18px;
       fill: currentColor;
     }
-    .header-palette-toggle,
     .header-open-editor {
       color: #ffffff;
     }
-    .header-palette-toggle:hover,
     .header-open-editor:hover {
       background: rgba(255,255,255,0.16);
     }
-    .header-palette-toggle svg,
     .header-open-editor svg {
       width: 18px;
       height: 18px;
@@ -2137,84 +2015,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       width: 0%;
       background: linear-gradient(90deg, var(--accent), var(--accent-strong));
       transition: width 0.08s linear;
-    }
-    .palette-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding-top: 12vh;
-      z-index: 1000;
-    }
-    .palette-modal {
-      width: min(560px, 90vw);
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: 0 16px 48px rgba(0,0,0,0.32);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      max-height: 70vh;
-    }
-    .palette-input {
-      width: 100%;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      padding: 14px 16px;
-      font-size: 15px;
-      background: transparent;
-      color: var(--text);
-      outline: none;
-    }
-    .palette-results {
-      overflow-y: auto;
-      padding: 4px 0;
-      flex: 1;
-    }
-    .palette-empty {
-      padding: 16px;
-      color: var(--text-muted);
-      text-align: center;
-      font-size: 13px;
-    }
-    .palette-item {
-      padding: 8px 16px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .palette-item.is-active {
-      background: var(--bg-muted);
-    }
-    .palette-item-label {
-      font-size: 14px;
-      color: var(--text);
-    }
-    .palette-item-path {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-    .palette-hint {
-      padding: 8px 16px;
-      border-top: 1px solid var(--border);
-      font-size: 11px;
-      color: var(--text-muted);
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .palette-hint kbd {
-      background: var(--bg-muted);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 1px 5px;
-      font-family: ui-monospace, monospace;
-      font-size: 10px;
     }
   `;
 

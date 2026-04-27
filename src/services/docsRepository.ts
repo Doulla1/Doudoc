@@ -39,7 +39,7 @@ export class DocsRepository {
   private externalFiles: string[] = [];
   private externalCounter = 0;
 
-  constructor(private readonly projectRoot: string) {}
+  constructor(private readonly projectRoot: string) { }
 
   setConfiguredPaths(paths: string[]): void {
     const sanitized = paths
@@ -225,7 +225,7 @@ export class DocsRepository {
       pathExists: (absolutePath) => syncFs.existsSync(absolutePath),
     });
 
-    const readingMinutes = Math.max(1, Math.round(page.wordCount / 200));
+    const readingMinutes = Math.max(1, Math.ceil(page.wordCount / 130));
 
     return {
       id: page.id,
