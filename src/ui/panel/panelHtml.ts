@@ -2270,11 +2270,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       cursor: default;
     }
     .cancel-btn {
-      background: rgba(255,255,255,0.16);
-      color: #ffffff;
+      background: var(--bg-elevated);
+      color: var(--fg);
+      border: 1px solid var(--border);
     }
     .cancel-btn:hover {
-      background: rgba(255,255,255,0.24);
+      background: var(--bg-hover);
     }
     .edit-toolbar {
       position: sticky;
