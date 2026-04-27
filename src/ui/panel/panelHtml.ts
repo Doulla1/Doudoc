@@ -26,6 +26,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           <button id="cancel-btn" class="edit-action-btn cancel-btn" type="button">Cancel</button>
         </div>
         <div class="header-actions">
+          <button class="icon-button is-plain header-toc-toggle" id="toc-toggle" type="button" aria-label="Hide table of contents" title="Toggle table of contents"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5h13a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1 0-1.5Zm0 5h13a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1 0-1.5Zm0 5h13a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1 0-1.5ZM3.5 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm0 5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm0 5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg></button>
           <button class="icon-button is-plain header-create-page" id="create-page" type="button" aria-label="Create new page" title="New page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg></button>
           <button class="icon-button is-plain header-zen-toggle" id="zen-toggle" type="button" aria-label="Toggle zen mode" title="Toggle zen mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 0h2v5h-5v-2h3v-3z"/></svg></button>
           <button class="icon-button is-plain header-open-editor" id="open-in-editor" type="button" aria-label="Open in VS Code editor" title="Open source in editor" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
@@ -121,6 +122,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     let currentHighlights = [];
     let currentHighlightIndex = -1;
     let isSidebarOpen = persistedViewState.isSidebarOpen !== false;
+    let isTocOpen = persistedViewState.isTocOpen !== false;
 
     const treeEl = document.getElementById('tree');
     const resultsEl = document.getElementById('results');
@@ -134,6 +136,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const pageWarningsEl = document.getElementById('page-warnings');
     const themeToggleEl = document.getElementById('theme-toggle');
     const sidebarToggleEl = document.getElementById('sidebar-toggle');
+    const tocToggleEl = document.getElementById('toc-toggle');
     const editToggleEl = document.getElementById('edit-toggle');
     const historyBackEl = document.getElementById('history-back');
     const historyForwardEl = document.getElementById('history-forward');
@@ -318,7 +321,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
 
     function persistViewState() {
-      vscode.setState({ isSidebarOpen });
+      vscode.setState({ isSidebarOpen, isTocOpen });
     }
 
     function renderSidebarToggle() {
@@ -332,6 +335,16 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       sidebarToggleEl.title = label;
       sidebarToggleEl.setAttribute('aria-label', label);
       sidebarToggleEl.setAttribute('aria-pressed', String(!isSidebarOpen));
+    }
+
+    function renderTocToggle() {
+      if (!tocToggleEl) return;
+      const label = isTocOpen ? 'Hide table of contents' : 'Show table of contents';
+      shellBodyEl.classList.toggle('is-toc-collapsed', !isTocOpen);
+      tocToggleEl.title = label;
+      tocToggleEl.setAttribute('aria-label', label);
+      tocToggleEl.setAttribute('aria-pressed', String(!isTocOpen));
+      tocToggleEl.classList.toggle('is-active', !isTocOpen);
     }
 
     function renderToc() {
@@ -1506,6 +1519,14 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       persistViewState();
     });
 
+    if (tocToggleEl) {
+      tocToggleEl.addEventListener('click', () => {
+        isTocOpen = !isTocOpen;
+        renderTocToggle();
+        persistViewState();
+      });
+    }
+
     themeToggleEl.addEventListener('click', () => {
       vscode.postMessage({ type: 'toggle-theme' });
     });
@@ -1644,6 +1665,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     });
 
     renderSidebarToggle();
+    renderTocToggle();
     vscode.postMessage({ type: 'panel-ready' });
   `;
 
@@ -1715,6 +1737,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     .shell-body.is-sidebar-collapsed {
       grid-template-columns: 0 minmax(0, 1fr) 220px;
     }
+    .shell-body.is-toc-collapsed {
+      grid-template-columns: 248px minmax(0, 1fr) 0;
+    }
+    .shell-body.is-sidebar-collapsed.is-toc-collapsed {
+      grid-template-columns: 0 minmax(0, 1fr) 0;
+    }
     .sidebar,
     .content-shell {
       min-height: 0;
@@ -1731,6 +1759,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       border-right: none;
       opacity: 0;
       pointer-events: none;
+    }
+    .shell-body.is-toc-collapsed .toc {
+      border-left: none;
+      opacity: 0;
+      pointer-events: none;
+      overflow: hidden;
     }
     .sidebar-top {
       padding: 10px 10px 8px;
@@ -2462,19 +2496,22 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
     .header-open-editor,
     .header-create-page,
-    .header-zen-toggle {
+    .header-zen-toggle,
+    .header-toc-toggle {
       color: var(--text-muted);
       transition: background 120ms ease, color 120ms ease;
     }
     .header-open-editor:hover,
     .header-create-page:hover,
-    .header-zen-toggle:hover {
+    .header-zen-toggle:hover,
+    .header-toc-toggle:hover {
       background: var(--bg-hover);
       color: var(--text);
     }
     .header-create-page svg,
     .header-zen-toggle svg,
-    .header-open-editor svg {
+    .header-open-editor svg,
+    .header-toc-toggle svg {
       width: 18px;
       height: 18px;
       fill: currentColor;
@@ -2538,6 +2575,13 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     :root[data-zen="on"] .sidebar { display: none; }
     :root[data-zen="on"] .toc { display: none; }
     :root[data-zen="on"] .shell-body { grid-template-columns: minmax(0, 1fr) !important; }
+    /* Zen mode hides TOC toggle */
+    :root[data-zen="on"] #toc-toggle { display: none; }
+    /* TOC toggle active state (TOC hidden) */
+    #toc-toggle.is-active {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
     /* Print stylesheet for PDF export via window.print() */
     @media print {
       :root, body { background: #ffffff !important; color: #000000 !important; }
