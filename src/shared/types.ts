@@ -8,6 +8,13 @@ export interface DocHeading {
   text: string;
 }
 
+export interface DocFrontMatter {
+  title?: string;
+  description?: string;
+  date?: string;
+  tags?: string[];
+}
+
 export interface DocTreeNode {
   id: string;
   type: DocNodeType;
@@ -29,6 +36,8 @@ export interface DocPageRecord {
   plainText: string;
   wordCount: number;
   headings: DocHeading[];
+  frontMatter?: DocFrontMatter;
+  lastModified?: number;
 }
 
 export interface RenderedDocPage {
@@ -41,6 +50,9 @@ export interface RenderedDocPage {
   warnings: string[];
   wordCount: number;
   readingMinutes: number;
+  frontMatter?: DocFrontMatter;
+  lastModified?: number;
+  lastModifiedSource?: 'git' | 'fs';
 }
 
 export interface DocSourceInfo {

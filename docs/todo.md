@@ -1,3 +1,26 @@
+# Todo — v2.5.0 Phase 15 + Phase 16.A-C : Front matter, fuzzy, autosave, zen, PDF, multi-root, settings
+
+**Début** : 2026-04-27 18:39
+**Fin** : 2026-04-27 18:53
+
+## Tâches
+
+- [x] Front matter YAML (titre, tags, description, date) parsé et exposé au panel
+- [x] Recherche fuzzy avec tolérance aux fautes (Levenshtein simple)
+- [x] Auto-save en mode édition (debounce paramétrable via setting)
+- [x] Création de page (commande + bouton `+`, scaffold avec front matter)
+- [x] Mode zen (toggle + setting + CSS)
+- [x] Export PDF (commande + bouton + stylesheet `@media print`)
+- [x] Date de dernière modification (git log + fallback fs)
+- [x] Quick-pick global de recherche (raccourci `Ctrl+Alt+P`)
+- [x] Multi-root workspace (scan combiné, prefixage source)
+- [x] Settings (theme, readingWidth, zen, useGitMTime, fuzzy)
+- [x] Mettre à jour les tests
+- [x] Mettre à jour la documentation (CHANGELOG, README, docs/todo.md)
+- [x] Bump version 2.5.0, commit + push
+
+---
+
 # Todo — v2.4.0 Tier 1 + multi-source + open any .md
 
 **Début** : 2026-04-27 18:02

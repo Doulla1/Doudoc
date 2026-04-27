@@ -4,26 +4,31 @@ import * as path from 'node:path';
 import { DocsRepository } from '@services/docsRepository';
 import { ExplorerViewProvider } from '@ui/view/ExplorerViewProvider';
 import { DocsPanel } from '@ui/panel/DocsPanel';
-import type { ExplorerToHostMessage, PanelToHostMessage } from '@shared/messages';
+import type { ExplorerToHostMessage, PanelToHostMessage, PanelPreferences, ReadingWidth } from '@shared/messages';
 import type { ThemeMode } from '@shared/types';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  const workspaceFolders = vscode.workspace.workspaceFolders;
   const persistedTheme = context.globalState.get<ThemeMode>('doudoc.theme');
 
-  if (!workspaceFolder) {
+  if (!workspaceFolders || workspaceFolders.length === 0) {
     return;
   }
 
-  const repository = new DocsRepository(workspaceFolder.uri.fsPath);
-  repository.setConfiguredPaths(readConfiguredPaths());
-  let panelTheme: ThemeMode = persistedTheme ?? 'light';
+  const repository = new DocsRepository(workspaceFolders.map((folder) => folder.uri.fsPath));
+  const config = readSettings();
+  repository.setConfiguredPaths(config.docsPaths);
+  repository.setUseGitMTime(config.useGitMTime);
+  repository.setFuzzySearchEnabled(config.fuzzySearch);
+
+  let panelTheme: ThemeMode = persistedTheme ?? resolveDefaultTheme(config.defaultTheme);
   let explorerTheme: ThemeMode = getActiveTheme();
   let selectedPath: string | null = null;
   let explorerQuery = '';
   let panelQuery = '';
   let isEditing = false;
   let editTimestamp: number | null = null;
+  let zenMode = context.globalState.get<boolean>('doudoc.zenMode') ?? config.zenMode;
   const watcherDisposables: vscode.Disposable[] = [];
 
   await repository.refresh();
@@ -34,19 +39,51 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveColorTheme(() => {
       explorerTheme = getActiveTheme();
+      const cfg = readSettings();
+      if (cfg.defaultTheme === 'auto') {
+        panelTheme = explorerTheme;
+      }
       void publishExplorerState();
+      const panel = DocsPanel.getCurrent();
+      if (panel) void publishPanelState(panel);
     }),
   );
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (event.affectsConfiguration('doudoc.docsPaths')) {
-        repository.setConfiguredPaths(readConfiguredPaths());
+      if (
+        event.affectsConfiguration('doudoc.docsPaths') ||
+        event.affectsConfiguration('doudoc.useGitMTime') ||
+        event.affectsConfiguration('doudoc.fuzzySearch') ||
+        event.affectsConfiguration('doudoc.zenMode') ||
+        event.affectsConfiguration('doudoc.defaultTheme') ||
+        event.affectsConfiguration('doudoc.readingWidth') ||
+        event.affectsConfiguration('doudoc.autoSave') ||
+        event.affectsConfiguration('doudoc.autoSaveDelay')
+      ) {
+        const cfg = readSettings();
+        repository.setConfiguredPaths(cfg.docsPaths);
+        repository.setUseGitMTime(cfg.useGitMTime);
+        repository.setFuzzySearchEnabled(cfg.fuzzySearch);
         await repository.refresh();
         ensureSelectedPath();
         rewireWatchers();
+        if (cfg.defaultTheme !== 'auto') {
+          panelTheme = cfg.defaultTheme;
+        }
         await publishAll();
       }
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(async () => {
+      const folders = vscode.workspace.workspaceFolders ?? [];
+      repository.setProjectRoots(folders.map((folder) => folder.uri.fsPath));
+      await repository.refresh();
+      ensureSelectedPath();
+      rewireWatchers();
+      await publishAll();
     }),
   );
 
@@ -90,6 +127,43 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await publishPanelState(panel);
       await publishCurrentPage(panel);
     }),
+    vscode.commands.registerCommand('doudoc.searchDocs', async () => {
+      const snapshot = repository.getSnapshot();
+      const items = snapshot.pages.map((page) => ({
+        label: page.label,
+        description: page.frontMatter?.description ?? '',
+        detail: page.relativePath,
+        relativePath: page.relativePath,
+      }));
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Search Doudoc pages by title…',
+        matchOnDetail: true,
+        matchOnDescription: true,
+      });
+      if (!picked) return;
+      selectedPath = picked.relativePath;
+      const panel = DocsPanel.createOrReveal(context, handleMessage, () => panelTheme);
+      await publishExplorerState();
+      await publishPanelState(panel);
+      await publishCurrentPage(panel);
+    }),
+    vscode.commands.registerCommand('doudoc.createPage', async () => {
+      await createNewPage();
+    }),
+    vscode.commands.registerCommand('doudoc.toggleZenMode', async () => {
+      zenMode = !zenMode;
+      await context.globalState.update('doudoc.zenMode', zenMode);
+      const panel = DocsPanel.getCurrent();
+      if (panel) await publishPanelState(panel);
+    }),
+    vscode.commands.registerCommand('doudoc.exportPagePdf', async () => {
+      const panel = DocsPanel.getCurrent();
+      if (!panel) {
+        await vscode.window.showInformationMessage('Doudoc: open the documentation panel first.');
+        return;
+      }
+      await panel.postMessage({ type: 'panel-trigger-print' });
+    }),
   );
 
   rewireWatchers();
@@ -105,19 +179,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     while (watcherDisposables.length > 0) {
       watcherDisposables.pop()?.dispose();
     }
+    const folders = vscode.workspace.workspaceFolders ?? [];
     const seen = new Set<string>();
-    for (const sourcePath of repository.getConfiguredPaths()) {
-      if (seen.has(sourcePath)) continue;
-      seen.add(sourcePath);
-      const watcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(workspaceFolder!, `${sourcePath.replace(/\/$/, '')}/**`),
-      );
-      watcherDisposables.push(
-        watcher,
-        watcher.onDidChange((uri) => void onWatcherEvent(uri, 'change')),
-        watcher.onDidCreate(() => void onWatcherEvent(null, 'create')),
-        watcher.onDidDelete(() => void onWatcherEvent(null, 'delete')),
-      );
+    for (const folder of folders) {
+      for (const sourcePath of repository.getConfiguredPaths()) {
+        const key = `${folder.uri.fsPath}:${sourcePath}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const watcher = vscode.workspace.createFileSystemWatcher(
+          new vscode.RelativePattern(folder, `${sourcePath.replace(/\/$/, '')}/**`),
+        );
+        watcherDisposables.push(
+          watcher,
+          watcher.onDidChange((uri) => void onWatcherEvent(uri, 'change')),
+          watcher.onDidCreate(() => void onWatcherEvent(null, 'create')),
+          watcher.onDidDelete(() => void onWatcherEvent(null, 'delete')),
+        );
+      }
     }
   }
 
@@ -137,6 +215,71 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await publishAll();
   }
 
+  async function createNewPage(): Promise<void> {
+    const sources = repository.getSnapshot().sources.filter((source) => !source.isExternal && source.exists);
+    if (sources.length === 0) {
+      await vscode.window.showWarningMessage('Doudoc: no writable docs source. Create the docs folder first.');
+      return;
+    }
+    let target = sources[0]!;
+    if (sources.length > 1) {
+      const picked = await vscode.window.showQuickPick(
+        sources.map((source) => ({ label: source.label, description: source.rootPath, source })),
+        { placeHolder: 'Choose a docs source' },
+      );
+      if (!picked) return;
+      target = picked.source;
+    }
+
+    const title = await vscode.window.showInputBox({
+      prompt: 'Title of the new page',
+      placeHolder: 'Getting started',
+      validateInput: (value) => (value.trim().length === 0 ? 'Title cannot be empty' : undefined),
+    });
+    if (!title) return;
+
+    const relative = await vscode.window.showInputBox({
+      prompt: 'Path inside the docs folder (relative, with .md extension)',
+      value: `${slugify(title)}.md`,
+      validateInput: (value) => {
+        if (!value.toLowerCase().endsWith('.md')) return 'File name must end with .md';
+        if (value.includes('..') || value.startsWith('/')) return 'Path must stay inside the docs folder';
+        return undefined;
+      },
+    });
+    if (!relative) return;
+
+    const absolutePath = path.normalize(path.resolve(target.rootPath, relative));
+    if (!absolutePath.startsWith(target.rootPath)) {
+      await vscode.window.showErrorMessage('Doudoc: target path escapes the docs folder.');
+      return;
+    }
+
+    try {
+      await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+      try {
+        await fs.access(absolutePath);
+        await vscode.window.showWarningMessage(`Doudoc: ${relative} already exists.`);
+        return;
+      } catch {
+        // File does not exist yet, proceed.
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const content = `---\ntitle: ${JSON.stringify(title)}\ndate: ${today}\ntags: []\n---\n\n# ${title}\n\nWrite your documentation here.\n`;
+      await fs.writeFile(absolutePath, content, 'utf8');
+      await repository.refresh();
+      const created = repository.getPageByAbsolutePath(absolutePath);
+      if (created) selectedPath = created.relativePath;
+      const panel = DocsPanel.createOrReveal(context, handleMessage, () => panelTheme);
+      await publishExplorerState();
+      await publishPanelState(panel);
+      await publishCurrentPage(panel);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown error';
+      await vscode.window.showErrorMessage(`Doudoc: failed to create page (${reason})`);
+    }
+  }
+
   async function handleMessage(message: ExplorerToHostMessage | PanelToHostMessage | unknown): Promise<void> {
     if (!message || typeof message !== 'object' || typeof (message as { type?: unknown }).type !== 'string') {
       return;
@@ -149,6 +292,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       anchor?: unknown;
       markdown?: unknown;
       dataUrl?: unknown;
+      isAutoSave?: unknown;
     };
 
     switch (typedMessage.type) {
@@ -164,28 +308,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       case 'explorer-search':
-        if (typeof typedMessage.query !== 'string') {
-          return;
-        }
+        if (typeof typedMessage.query !== 'string') return;
         explorerQuery = typedMessage.query;
         await publishExplorerState();
         return;
       case 'panel-search': {
-        if (typeof typedMessage.query !== 'string') {
-          return;
-        }
+        if (typeof typedMessage.query !== 'string') return;
         panelQuery = typedMessage.query;
         const panel = DocsPanel.getCurrent();
-        if (panel) {
-          await publishPanelState(panel);
-        }
+        if (panel) await publishPanelState(panel);
         return;
       }
       case 'open-page':
       case 'panel-open-page': {
-        if (typeof typedMessage.relativePath !== 'string') {
-          return;
-        }
+        if (typeof typedMessage.relativePath !== 'string') return;
         selectedPath = typedMessage.relativePath;
         const panel = DocsPanel.createOrReveal(context, handleMessage, () => panelTheme);
         await publishExplorerState();
@@ -203,10 +339,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ensureSelectedPath();
         await publishAll();
         return;
-      case 'panel-enter-edit': {
-        if (!selectedPath) {
-          return;
+      case 'panel-toggle-zen':
+        zenMode = !zenMode;
+        await context.globalState.update('doudoc.zenMode', zenMode);
+        {
+          const panel = DocsPanel.getCurrent();
+          if (panel) await publishPanelState(panel);
         }
+        return;
+      case 'panel-export-pdf':
+        // Webview prints itself; nothing else to do here.
+        return;
+      case 'panel-create-page':
+        await createNewPage();
+        return;
+      case 'panel-enter-edit': {
+        if (!selectedPath) return;
         isEditing = true;
         editTimestamp = repository.getPageTimestamp(selectedPath);
         const editPanel = DocsPanel.getCurrent();
@@ -216,25 +364,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       case 'panel-save-page': {
-        if (typeof typedMessage.markdown !== 'string' || !selectedPath) {
-          return;
-        }
+        if (typeof typedMessage.markdown !== 'string' || !selectedPath) return;
+        const isAutoSave = typedMessage.isAutoSave === true;
         const savePanel = DocsPanel.getCurrent();
         try {
           await repository.savePage(selectedPath, typedMessage.markdown);
-          isEditing = false;
-          editTimestamp = null;
+          if (!isAutoSave) {
+            isEditing = false;
+            editTimestamp = null;
+          }
           await repository.refresh();
           if (savePanel) {
-            await savePanel.postMessage({ type: 'panel-save-result', success: true });
+            await savePanel.postMessage({ type: 'panel-save-result', success: true, isAutoSave });
             await publishPanelState(savePanel);
-            await publishCurrentPage(savePanel);
+            if (!isAutoSave) await publishCurrentPage(savePanel);
           }
           await publishExplorerState();
         } catch (error) {
           if (savePanel) {
             const reason = error instanceof Error ? error.message : 'Unknown error';
-            await savePanel.postMessage({ type: 'panel-save-result', success: false, error: reason });
+            await savePanel.postMessage({ type: 'panel-save-result', success: false, error: reason, isAutoSave });
           }
         }
         return;
@@ -244,13 +393,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         editTimestamp = null;
         return;
       case 'panel-paste-image': {
-        if (typeof typedMessage.dataUrl !== 'string' || !isEditing) {
-          return;
-        }
+        if (typeof typedMessage.dataUrl !== 'string' || !isEditing) return;
         const pastePanel = DocsPanel.getCurrent();
-        if (!pastePanel) {
-          return;
-        }
+        if (!pastePanel) return;
         try {
           const currentPage = selectedPath
             ? repository.getSnapshot().pages.find((page) => page.relativePath === selectedPath)
@@ -275,9 +420,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const absolutePath = path.join(assetsDir, fileName);
           await fs.writeFile(absolutePath, buffer);
 
-          // Compute relative path from the current page's directory so the
-          // markdown-it image resolver (which resolves relative to the page)
-          // can locate the asset regardless of how deep the page is.
           const pageAbsoluteDir = path.dirname(currentPage.absolutePath);
           const relativePath = path.relative(pageAbsoluteDir, absolutePath).split(path.sep).join('/');
           const assetUri = pastePanel.getWebview().asWebviewUri(vscode.Uri.file(absolutePath)).toString();
@@ -289,19 +431,50 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       case 'panel-open-in-editor': {
-        if (typeof typedMessage.relativePath !== 'string') {
-          return;
-        }
+        if (typeof typedMessage.relativePath !== 'string') return;
         const target = repository.getSnapshot().pages.find((page) => page.relativePath === typedMessage.relativePath);
-        if (!target) {
-          return;
-        }
+        if (!target) return;
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(target.absolutePath));
         return;
       }
       default:
         return;
     }
+  }
+
+  function getPreferences(): PanelPreferences {
+    const cfg = readSettings();
+    return {
+      readingWidth: cfg.readingWidth,
+      zenMode,
+      autoSave: cfg.autoSave,
+      autoSaveDelay: cfg.autoSaveDelay,
+    };
+  }
+
+  function buildPanelStatePayload(): {
+    theme: ThemeMode;
+    tree: ReturnType<typeof repository.getSnapshot>['tree'];
+    selectedPath: string | null;
+    query: string;
+    hasDocsDirectory: boolean;
+    docsRoot: string | null;
+    results: ReturnType<typeof repository.search>;
+    warnings: string[];
+    preferences: PanelPreferences;
+  } {
+    const snapshot = repository.getSnapshot();
+    return {
+      theme: panelTheme,
+      tree: snapshot.tree,
+      selectedPath,
+      query: panelQuery,
+      hasDocsDirectory: snapshot.hasDocsDirectory,
+      docsRoot: snapshot.docsRoot,
+      results: repository.search(panelQuery),
+      warnings: snapshot.warnings,
+      preferences: getPreferences(),
+    };
   }
 
   async function publishAll(): Promise<void> {
@@ -331,19 +504,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   async function publishPanelState(panel: DocsPanel): Promise<void> {
-    const snapshot = repository.getSnapshot();
-
-    await panel.postMessage({
-      type: 'panel-state',
-      theme: panelTheme,
-      tree: snapshot.tree,
-      selectedPath,
-      query: panelQuery,
-      hasDocsDirectory: snapshot.hasDocsDirectory,
-      docsRoot: snapshot.docsRoot,
-      results: repository.search(panelQuery),
-      warnings: snapshot.warnings,
-    });
+    await panel.postMessage({ type: 'panel-state', ...buildPanelStatePayload() });
   }
 
   async function publishCurrentPage(panel: DocsPanel, anchor?: string): Promise<void> {
@@ -362,7 +523,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       selectedPath = repository.getDefaultPagePath();
       return;
     }
-
     const stillExists = repository.getSnapshot().pages.some((page) => page.relativePath === selectedPath);
     if (!stillExists) {
       selectedPath = repository.getDefaultPagePath();
@@ -372,19 +532,53 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await publishExplorerState();
 }
 
-export function deactivate(): void {}
+export function deactivate(): void { }
 
-function readConfiguredPaths(): string[] {
+interface DoudocSettings {
+  docsPaths: string[];
+  autoSave: boolean;
+  autoSaveDelay: number;
+  defaultTheme: 'auto' | 'light' | 'dark';
+  readingWidth: ReadingWidth;
+  zenMode: boolean;
+  useGitMTime: boolean;
+  fuzzySearch: boolean;
+}
+
+function readSettings(): DoudocSettings {
   const config = vscode.workspace.getConfiguration('doudoc');
-  const value = config.get<string[]>('docsPaths', ['docs']);
-  if (!Array.isArray(value)) {
-    return ['docs'];
-  }
-  return value
-    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-    .map((entry) => entry.trim());
+  const docsPaths = config.get<string[]>('docsPaths', ['docs']);
+  const widthRaw = config.get<string>('readingWidth', 'comfortable');
+  const themeRaw = config.get<string>('defaultTheme', 'auto');
+  return {
+    docsPaths: Array.isArray(docsPaths)
+      ? docsPaths.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0).map((entry) => entry.trim())
+      : ['docs'],
+    autoSave: config.get<boolean>('autoSave', false),
+    autoSaveDelay: Math.max(500, Math.min(60000, config.get<number>('autoSaveDelay', 2000))),
+    defaultTheme: themeRaw === 'light' || themeRaw === 'dark' ? themeRaw : 'auto',
+    readingWidth: ['narrow', 'comfortable', 'wide', 'full'].includes(widthRaw) ? (widthRaw as ReadingWidth) : 'comfortable',
+    zenMode: config.get<boolean>('zenMode', false),
+    useGitMTime: config.get<boolean>('useGitMTime', true),
+    fuzzySearch: config.get<boolean>('fuzzySearch', true),
+  };
+}
+
+function resolveDefaultTheme(value: 'auto' | 'light' | 'dark'): ThemeMode {
+  if (value === 'auto') return getActiveTheme();
+  return value;
 }
 
 function getActiveTheme(): ThemeMode {
   return vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light ? 'light' : 'dark';
+}
+
+function slugify(input: string): string {
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'page';
 }

@@ -2,7 +2,7 @@
   "name": "doudoc",
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "publisher": "Doudou",
   "license": "MIT",
   "repository": {
@@ -42,7 +42,11 @@
     "onView:doudoc.explorerView",
     "onCommand:doudoc.openPanel",
     "onCommand:doudoc.refresh",
-    "onCommand:doudoc.openMarkdownFile"
+    "onCommand:doudoc.openMarkdownFile",
+    "onCommand:doudoc.searchDocs",
+    "onCommand:doudoc.createPage",
+    "onCommand:doudoc.toggleZenMode",
+    "onCommand:doudoc.exportPagePdf"
   ],
   "main": "./dist/extension.js",
   "icon": "media/logo.png",
@@ -52,9 +56,61 @@
       "properties": {
         "doudoc.docsPaths": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["docs"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "docs"
+          ],
           "description": "List of folder paths (relative to the workspace root) scanned by Doudoc as documentation sources. Defaults to a single 'docs' folder."
+        },
+        "doudoc.autoSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-save the current page in edit mode after a short delay (see doudoc.autoSaveDelay)."
+        },
+        "doudoc.autoSaveDelay": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 500,
+          "maximum": 60000,
+          "description": "Delay (in ms) before auto-save triggers after the last edit."
+        },
+        "doudoc.defaultTheme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "default": "auto",
+          "description": "Default theme used by the documentation panel: 'auto' follows VS Code, 'light' or 'dark' force a specific theme."
+        },
+        "doudoc.readingWidth": {
+          "type": "string",
+          "enum": [
+            "narrow",
+            "comfortable",
+            "wide",
+            "full"
+          ],
+          "default": "comfortable",
+          "description": "Reading width of the content column: narrow (~640px), comfortable (~760px), wide (~960px) or full."
+        },
+        "doudoc.zenMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start Doudoc in zen mode (sidebar and table of contents hidden, content centered)."
+        },
+        "doudoc.useGitMTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use the date of the last git commit touching the file as 'last modified' (falls back to filesystem mtime)."
+        },
+        "doudoc.fuzzySearch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow fuzzy matches in the search index (small typo tolerance on titles and headings)."
         }
       }
     },
@@ -73,6 +129,26 @@
         "command": "doudoc.openMarkdownFile",
         "title": "Open with Doudoc",
         "icon": "$(book)"
+      },
+      {
+        "command": "doudoc.searchDocs",
+        "title": "Doudoc: Search Documentation",
+        "icon": "$(search)"
+      },
+      {
+        "command": "doudoc.createPage",
+        "title": "Doudoc: New Documentation Page...",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "doudoc.toggleZenMode",
+        "title": "Doudoc: Toggle Zen Mode",
+        "icon": "$(screen-full)"
+      },
+      {
+        "command": "doudoc.exportPagePdf",
+        "title": "Doudoc: Export Current Page (PDF / Print)",
+        "icon": "$(file-pdf)"
       }
     ],
     "viewsContainers": {
@@ -97,6 +173,11 @@
       "view/title": [
         {
           "command": "doudoc.openPanel",
+          "when": "view == doudoc.explorerView",
+          "group": "navigation"
+        },
+        {
+          "command": "doudoc.createPage",
           "when": "view == doudoc.explorerView",
           "group": "navigation"
         },
@@ -127,7 +208,14 @@
           "group": "navigation@10"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "doudoc.searchDocs",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

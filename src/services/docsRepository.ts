@@ -38,8 +38,30 @@ export class DocsRepository {
   private configuredPaths: string[] = ['docs'];
   private externalFiles: string[] = [];
   private externalCounter = 0;
+  private gitMtimeCache = new Map<string, number | null>();
+  private projectRoots: string[];
+  private useGitMTime = true;
+  private fuzzySearchEnabled = true;
 
-  constructor(private readonly projectRoot: string) { }
+  constructor(projectRoot: string | string[]) {
+    this.projectRoots = Array.isArray(projectRoot) ? [...projectRoot] : [projectRoot];
+  }
+
+  setProjectRoots(roots: string[]): void {
+    this.projectRoots = roots.length > 0 ? [...roots] : this.projectRoots;
+  }
+
+  getProjectRoots(): string[] {
+    return [...this.projectRoots];
+  }
+
+  setUseGitMTime(value: boolean): void {
+    this.useGitMTime = value;
+  }
+
+  setFuzzySearchEnabled(value: boolean): void {
+    this.fuzzySearchEnabled = value;
+  }
 
   setConfiguredPaths(paths: string[]): void {
     const sanitized = paths
@@ -69,6 +91,7 @@ export class DocsRepository {
   }
 
   async refresh(): Promise<DocsSnapshot> {
+    this.gitMtimeCache.clear();
     const sources = await this.buildSources();
 
     if (sources.length === 0) {
@@ -163,7 +186,7 @@ export class DocsRepository {
   }
 
   search(query: string): DocSearchResult[] {
-    return searchPages(this.snapshot.pages, query);
+    return searchPages(this.snapshot.pages, query, { fuzzy: this.fuzzySearchEnabled });
   }
 
   filterTree(query: string): DocTreeNode[] {
@@ -176,7 +199,12 @@ export class DocsRepository {
     const matchingPaths = new Set(
       this.snapshot.pages
         .filter((page) => {
-          const haystack = normalizeSearchText([page.label, ...page.headings.map((heading) => heading.text), page.plainText].join(' '));
+          const fmText = page.frontMatter
+            ? [page.frontMatter.description ?? '', ...(page.frontMatter.tags ?? [])].join(' ')
+            : '';
+          const haystack = normalizeSearchText(
+            [page.label, ...page.headings.map((heading) => heading.text), fmText, page.plainText].join(' '),
+          );
           return haystack.includes(normalizedQuery);
         })
         .map((page) => page.relativePath),
@@ -227,6 +255,8 @@ export class DocsRepository {
 
     const readingMinutes = Math.max(1, Math.ceil(page.wordCount / 130));
 
+    const gitMtime = this.getGitLastModified(page.absolutePath);
+
     return {
       id: page.id,
       label: page.label,
@@ -237,7 +267,39 @@ export class DocsRepository {
       warnings: rendered.warnings,
       wordCount: page.wordCount,
       readingMinutes,
+      frontMatter: page.frontMatter,
+      lastModified: gitMtime ?? page.lastModified,
+      lastModifiedSource: gitMtime ? 'git' : page.lastModified ? 'fs' : undefined,
     };
+  }
+
+  private getGitLastModified(absolutePath: string): number | undefined {
+    if (!this.useGitMTime) return undefined;
+    if (this.gitMtimeCache.has(absolutePath)) {
+      const cached = this.gitMtimeCache.get(absolutePath);
+      return cached === null ? undefined : cached ?? undefined;
+    }
+    try {
+      // child_process is only loaded lazily so it stays optional in tests.
+      const cp: typeof import('node:child_process') = require('node:child_process');
+      const result = cp.spawnSync(
+        'git',
+        ['log', '-1', '--format=%ct', '--', absolutePath],
+        { cwd: path.dirname(absolutePath), encoding: 'utf8', timeout: 1500 },
+      );
+      if (result.status === 0 && result.stdout.trim()) {
+        const seconds = Number.parseInt(result.stdout.trim(), 10);
+        if (Number.isFinite(seconds) && seconds > 0) {
+          const ms = seconds * 1000;
+          this.gitMtimeCache.set(absolutePath, ms);
+          return ms;
+        }
+      }
+    } catch {
+      // Git unavailable or path not tracked.
+    }
+    this.gitMtimeCache.set(absolutePath, null);
+    return undefined;
   }
 
   getPageByAbsolutePath(absolutePath: string): DocPageRecord | undefined {
@@ -280,23 +342,28 @@ export class DocsRepository {
   private async buildSources(): Promise<DocSourceConfig[]> {
     const sources: DocSourceConfig[] = [];
     const usedKeys = new Set<string>();
+    const multiRoot = this.projectRoots.length > 1;
 
-    for (const configuredPath of this.configuredPaths) {
-      const rootAbsolute = path.normalize(path.resolve(this.projectRoot, configuredPath));
-      let key = configuredPath;
-      let suffix = 1;
-      while (usedKeys.has(key)) {
-        suffix += 1;
-        key = `${configuredPath}#${suffix}`;
+    for (const projectRoot of this.projectRoots) {
+      const rootName = path.basename(projectRoot);
+      for (const configuredPath of this.configuredPaths) {
+        const rootAbsolute = path.normalize(path.resolve(projectRoot, configuredPath));
+        const baseLabel = multiRoot ? `${rootName}/${configuredPath}` : configuredPath;
+        let key = baseLabel;
+        let suffix = 1;
+        while (usedKeys.has(key)) {
+          suffix += 1;
+          key = `${baseLabel}#${suffix}`;
+        }
+        usedKeys.add(key);
+        sources.push({
+          configuredPath,
+          rootAbsolute,
+          key,
+          label: baseLabel,
+          isExternal: false,
+        });
       }
-      usedKeys.add(key);
-      sources.push({
-        configuredPath,
-        rootAbsolute,
-        key,
-        label: configuredPath,
-        isExternal: false,
-      });
     }
 
     for (const externalFile of this.externalFiles) {
@@ -357,6 +424,8 @@ export class DocsRepository {
       const analysis = analyzeMarkdown(rawMarkdown);
       const label = analysis.firstTitle ?? formatFileLabel(fileName);
       const wordCount = analysis.plainText ? analysis.plainText.split(/\s+/).filter(Boolean).length : 0;
+      let lastModified: number | undefined;
+      try { lastModified = syncFs.statSync(absolutePath).mtimeMs; } catch { /* ignore */ }
       const page: DocPageRecord = {
         id: `file:${relativePath}`,
         label,
@@ -369,6 +438,8 @@ export class DocsRepository {
         plainText: analysis.plainText,
         wordCount,
         headings: analysis.headings,
+        frontMatter: analysis.frontMatter ?? undefined,
+        lastModified,
       };
       pages.push(page);
       return {
@@ -435,6 +506,8 @@ export class DocsRepository {
         const analysis = analyzeMarkdown(rawMarkdown);
         const label = analysis.firstTitle ?? formatFileLabel(entry.name);
         const wordCount = analysis.plainText ? analysis.plainText.split(/\s+/).filter(Boolean).length : 0;
+        let lastModified: number | undefined;
+        try { lastModified = syncFs.statSync(absolutePath).mtimeMs; } catch { /* ignore */ }
 
         const page: DocPageRecord = {
           id: `file:${relativePath}`,
@@ -448,6 +521,8 @@ export class DocsRepository {
           plainText: analysis.plainText,
           wordCount,
           headings: analysis.headings,
+          frontMatter: analysis.frontMatter ?? undefined,
+          lastModified,
         };
 
         pages.push(page);

@@ -27,7 +27,8 @@ import shell from 'highlight.js/lib/languages/shell';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createSlug } from './slug';
-import type { DocHeading } from '@shared/types';
+import { parseFrontMatter } from './frontMatter';
+import type { DocFrontMatter, DocHeading } from '@shared/types';
 
 hljs.registerLanguage('javascript', javascript);
 hljs.registerLanguage('js', javascript);
@@ -77,6 +78,8 @@ export interface MarkdownAnalysis {
   firstTitle: string | null;
   headings: DocHeading[];
   plainText: string;
+  frontMatter: DocFrontMatter | null;
+  body: string;
 }
 
 interface RenderContext {
@@ -158,8 +161,9 @@ export function extractRelativeLinks(markdown: string): string[] {
 }
 
 export function analyzeMarkdown(markdown: string): MarkdownAnalysis {
+  const { frontMatter, body } = parseFrontMatter(markdown);
   const markdownIt = createMarkdownIt();
-  const tokens = markdownIt.parse(markdown, {});
+  const tokens = markdownIt.parse(body, {});
   const headings: DocHeading[] = [];
   const slugCounts = new Map<string, number>();
   let firstTitle: string | null = null;
@@ -203,16 +207,20 @@ export function analyzeMarkdown(markdown: string): MarkdownAnalysis {
     }
   }
 
+  const fmTitle = frontMatter && typeof frontMatter.title === 'string' ? frontMatter.title.trim() : '';
   return {
-    firstTitle,
+    firstTitle: fmTitle || firstTitle,
     headings,
     plainText: textParts.join(' ').replace(/\s+/g, ' ').trim(),
+    frontMatter: frontMatter ?? null,
+    body,
   };
 }
 
 export function renderMarkdown(markdown: string, context: RenderContext): { html: string; headings: DocHeading[]; warnings: string[] } {
+  const { body } = parseFrontMatter(markdown);
   const markdownIt = createMarkdownIt();
-  const tokens = markdownIt.parse(markdown, {});
+  const tokens = markdownIt.parse(body, {});
   const headings: DocHeading[] = [];
   const slugCounts = new Map<string, number>();
   const warnings: string[] = [];

@@ -26,6 +26,9 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           <button id="cancel-btn" class="edit-action-btn cancel-btn" type="button">Cancel</button>
         </div>
         <div class="header-actions">
+          <button class="icon-button is-plain header-create-page" id="create-page" type="button" aria-label="Create new page" title="New page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg></button>
+          <button class="icon-button is-plain header-zen-toggle" id="zen-toggle" type="button" aria-label="Toggle zen mode" title="Toggle zen mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 0h2v5h-5v-2h3v-3z"/></svg></button>
+          <button class="icon-button is-plain header-print" id="print-page" type="button" aria-label="Print / Export PDF" title="Print / Export PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5a3 3 0 0 0-3 3v6h4v4h12v-4h4v-6a3 3 0 0 0-3-3zM8 19v-5h8v5H8zm11-7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM18 3H6v4h12V3z"/></svg></button>
           <button class="icon-button is-plain header-open-editor" id="open-in-editor" type="button" aria-label="Open in VS Code editor" title="Open source in editor" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
           <button class="icon-button is-plain header-edit-toggle" id="edit-toggle" type="button" aria-label="Edit page" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.548 20.938h16.9a.75.75 0 0 1 0 1.5H3.548a.75.75 0 0 1 0-1.5ZM18.205 2.295a2.423 2.423 0 0 1 3.426 3.426l-1.38 1.38-3.427-3.426 1.38-1.38Zm-2.44 2.44 3.427 3.427L8.52 18.834a.75.75 0 0 1-.349.197l-4.5 1.273a.75.75 0 0 1-.926-.926l1.273-4.5a.75.75 0 0 1 .197-.349L14.765 4.735Z"/></svg></button>
           <button class="icon-button is-plain header-theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
@@ -134,6 +137,9 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const historyBackEl = document.getElementById('history-back');
     const historyForwardEl = document.getElementById('history-forward');
     const openInEditorEl = document.getElementById('open-in-editor');
+    const createPageEl = document.getElementById('create-page');
+    const zenToggleEl = document.getElementById('zen-toggle');
+    const printPageEl = document.getElementById('print-page');
     const brandSubtitleEl = document.getElementById('brand-subtitle');
     const readingProgressBarEl = document.getElementById('reading-progress-bar');
     const editToolbarEl = document.getElementById('edit-toolbar');
@@ -157,6 +163,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     let historyStack = [];
     let historyIndex = -1;
     let isHistoryNavigation = false;
+    let preferences = { readingWidth: 'comfortable', zenMode: false, autoSave: false, autoSaveDelay: 2000 };
+    let autoSaveTimer = null;
 
     // Mermaid initialization — deferred via async script load event to avoid blocking page render
     let mermaidReady = false;
@@ -377,7 +385,29 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         return;
       }
       const minutes = page.readingMinutes || 1;
-      brandSubtitleEl.textContent = minutes + ' min read';
+      const parts = [minutes + ' min read'];
+      if (page.lastModified) {
+        const date = new Date(page.lastModified);
+        if (!Number.isNaN(date.getTime())) {
+          const formatted = date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+          const prefix = page.lastModifiedSource === 'git' ? 'updated' : 'modified';
+          parts.push(prefix + ' ' + formatted);
+        }
+      }
+      brandSubtitleEl.textContent = parts.join(' · ');
+    }
+
+    function buildPageHeader(page) {
+      if (!page) return '';
+      const fm = page.frontMatter || {};
+      const tags = Array.isArray(fm.tags) ? fm.tags : [];
+      const tagsHtml = tags.length
+        ? '<div class="doc-tags">' + tags.map(function(tag) { return '<span class="doc-tag">' + escapeHtml(tag) + '</span>'; }).join('') + '</div>'
+        : '';
+      const descHtml = fm.description ? '<p class="doc-description">' + escapeHtml(fm.description) + '</p>' : '';
+      const dateHtml = fm.date ? '<div class="doc-date">' + escapeHtml(fm.date) + '</div>' : '';
+      if (!tagsHtml && !descHtml && !dateHtml) return '';
+      return '<header class="doc-header">' + dateHtml + descHtml + tagsHtml + '</header>';
     }
 
     function updateReadingProgress() {
@@ -419,7 +449,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         pageWarningsEl.innerHTML = '';
       }
 
-      contentEl.innerHTML = '<article class="doc-article">' + page.html + '</article>';
+      contentEl.innerHTML = '<article class="doc-article">' + buildPageHeader(page) + page.html + '</article>';
       bindContentLinks();
       renderMermaidDiagrams();
       renderToc();
@@ -1089,7 +1119,20 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     });
 
     contentEl.addEventListener('input', function() {
-      if (isEditMode) hasUnsavedChanges = true;
+      if (!isEditMode) return;
+      hasUnsavedChanges = true;
+      if (preferences.autoSave) {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        const delay = Math.max(500, preferences.autoSaveDelay || 2000);
+        autoSaveTimer = setTimeout(function() {
+          if (!isEditMode) return;
+          const article = contentEl.querySelector('.doc-article');
+          if (!article) return;
+          const markdown = contentToMarkdown(article);
+          if (editStatusEl) editStatusEl.textContent = 'Auto-saving…';
+          vscode.postMessage({ type: 'panel-save-page', markdown: markdown, isAutoSave: true });
+        }, delay);
+      }
     });
 
     contentEl.addEventListener('paste', function(e) {
@@ -1175,6 +1218,22 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       });
     }
 
+    if (createPageEl) {
+      createPageEl.addEventListener('click', () => {
+        vscode.postMessage({ type: 'panel-create-page' });
+      });
+    }
+    if (zenToggleEl) {
+      zenToggleEl.addEventListener('click', () => {
+        vscode.postMessage({ type: 'panel-toggle-zen' });
+      });
+    }
+    if (printPageEl) {
+      printPageEl.addEventListener('click', () => {
+        try { window.print(); } catch (e) { /* noop */ }
+      });
+    }
+
     document.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -1206,6 +1265,11 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (message.type === 'panel-state') {
         panelState = message;
         document.documentElement.dataset.theme = panelState.theme;
+        if (message.preferences) {
+          preferences = message.preferences;
+          document.documentElement.dataset.readingWidth = preferences.readingWidth || 'comfortable';
+          document.documentElement.dataset.zen = preferences.zenMode ? 'on' : 'off';
+        }
         if (mermaidReady && typeof mermaid !== 'undefined') {
           mermaid.initialize({
             startOnLoad: false,
@@ -1236,7 +1300,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (message.type === 'panel-save-result') {
         saveBtnEl.disabled = false;
         if (message.success) {
-          exitEditMode();
+          if (message.isAutoSave) {
+            if (editStatusEl) editStatusEl.textContent = 'Auto-saved';
+            hasUnsavedChanges = false;
+          } else {
+            exitEditMode();
+          }
         } else {
           editStatusEl.textContent = 'Error: ' + (message.error || 'Save failed');
         }
@@ -1245,6 +1314,11 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
 
       if (message.type === 'panel-edit-conflict') {
         editConflictEl.style.display = '';
+        return;
+      }
+
+      if (message.type === 'panel-trigger-print') {
+        try { window.print(); } catch (e) { /* noop */ }
         return;
       }
 
@@ -2015,6 +2089,85 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       width: 0%;
       background: linear-gradient(90deg, var(--accent), var(--accent-strong));
       transition: width 0.08s linear;
+    }
+    /* Front matter header */
+    .doc-header {
+      margin: 0 0 24px;
+      padding: 0 0 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-header .doc-date {
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .doc-header .doc-description {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin: 0 0 12px;
+    }
+    .doc-header .doc-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .doc-header .doc-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 9px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: var(--bg-muted);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    /* Reading width */
+    :root[data-reading-width="narrow"] .doc-article { max-width: 640px; margin: 0 auto; }
+    :root[data-reading-width="comfortable"] .doc-article { max-width: 760px; margin: 0 auto; }
+    :root[data-reading-width="wide"] .doc-article { max-width: 960px; margin: 0 auto; }
+    :root[data-reading-width="full"] .doc-article { max-width: none; }
+    /* Zen mode: hide sidebar, hide TOC, center content */
+    :root[data-zen="on"] .sidebar { display: none; }
+    :root[data-zen="on"] .toc { display: none; }
+    :root[data-zen="on"] .shell-body { grid-template-columns: minmax(0, 1fr) !important; }
+    /* Print stylesheet for PDF export via window.print() */
+    @media print {
+      :root, body { background: #ffffff !important; color: #000000 !important; }
+      .layout { display: block !important; height: auto !important; }
+      .shell-header,
+      .sidebar,
+      .toc,
+      .reading-progress,
+      .page-toolbar,
+      .edit-toolbar,
+      .edit-actions,
+      #edit-conflict,
+      .insert-dialog,
+      .scan-warnings,
+      .page-warnings,
+      .header-actions,
+      .header-history,
+      .header-search,
+      .header-sidebar-toggle,
+      .header-open-editor,
+      .code-copy-btn { display: none !important; }
+      .shell-body { display: block !important; height: auto !important; overflow: visible !important; }
+      .content-shell { display: block !important; height: auto !important; overflow: visible !important; }
+      .content { padding: 0 !important; overflow: visible !important; height: auto !important; }
+      .doc-article {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #000000 !important;
+        line-height: 1.55 !important;
+      }
+      .doc-article a { color: #000000; text-decoration: underline; }
+      .doc-article pre, .doc-article code { background: #f5f5f5 !important; color: #000 !important; }
+      .doc-article h1, .doc-article h2, .doc-article h3 { page-break-after: avoid; }
+      .doc-article pre, .doc-article table, .doc-article img { page-break-inside: avoid; }
     }
   `;
 

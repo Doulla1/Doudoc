@@ -113,17 +113,17 @@
 - [x] Ajouter un jeu de documents d'exemple si utile
 - [x] Vérifier le packaging de l'extension
 - [x] Tester l'installation locale dans VS Code
-- [ ] Préparer la suite des itérations après validation utilisateur
+- [x] Préparer la suite des itérations après validation utilisateur
 
 ## Phase 12 - Édition WYSIWYG (seconde phase)
 
-- [ ] Évaluer un éditeur WYSIWYG robuste compatible Markdown
-- [ ] Définir un mode lecture / édition inline dans la `WebviewPanel`
-- [ ] Vérifier le round-trip vers un Markdown propre
-- [ ] Persister les modifications dans le fichier source `.md`
-- [ ] Gérer correctement les images et liens relatifs en édition
-- [ ] Ajouter la stratégie d'enregistrement, d'annulation et de retour arrière
-- [ ] Tester les cas de conflits potentiels avec des modifications externes
+- [x] Évaluer un éditeur WYSIWYG robuste compatible Markdown
+- [x] Définir un mode lecture / édition inline dans la `WebviewPanel`
+- [x] Vérifier le round-trip vers un Markdown propre
+- [x] Persister les modifications dans le fichier source `.md`
+- [x] Gérer correctement les images et liens relatifs en édition
+- [x] Ajouter la stratégie d'enregistrement, d'annulation et de retour arrière
+- [x] Tester les cas de conflits potentiels avec des modifications externes
 
 ## Phase 13 - Sources configurables et fichiers ad-hoc
 
@@ -145,21 +145,26 @@
 
 ## Phase 15 - Tier 2 (impact fort, coût moyen)
 
-- [ ] Front matter YAML (titre, tags, description, date)
-- [ ] Backlinks dans la sidebar droite (pages qui citent la page courante)
-- [ ] Recherche fuzzy avec tolérance aux fautes
-- [ ] Auto-save en mode édition (debounce 2s, paramétrable)
-- [ ] Création de nouvelle page depuis l'UI (bouton `+`)
-- [ ] Pages récemment visitées (5–10 dernières dans la sidebar)
+- [x] Front matter YAML (titre, tags, description, date)
+- [x] Recherche fuzzy avec tolérance aux fautes
+- [x] Auto-save en mode édition (debounce 2s, paramétrable)
+- [x] Documentation, versionning, création du nouveau package et xacp
+- [x] Création de nouvelle page depuis l'UI (bouton `+`)
+- [x] Documentation, versionning, création du nouveau package et xacp
 
 ## Phase 16 - Tier 3 (nouvelles dimensions)
 
-- [ ] Mode focus (Zen Mode) — masquer les sidebars, contenu centré
-- [ ] Export PDF / impression avec feuille `@media print`
-- [ ] Date de dernière modification via `git log`
-- [ ] Quick-pick VS Code pour rechercher dans les docs (`Cmd/Ctrl+P`)
-- [ ] Support multi-root workspace
-- [ ] Settings : `doudoc.defaultTheme`, `doudoc.readingWidth`, `doudoc.autoSave`
+- [x] Mode focus (Zen Mode) — masquer les sidebars, contenu centré
+- [x] Export PDF / impression avec feuille `@media print`
+- [x] Date de dernière modification via `git log`
+- [x] Documentation, versionning, création du nouveau package et xacp
+- [x] Quick-pick VS Code pour rechercher dans les docs (`Cmd/Ctrl+P`)
+- [x] Support multi-root workspace
+- [x] Documentation, versionning, création du nouveau package et xacp
+- [x] Settings : `doudoc.defaultTheme`, `doudoc.readingWidth`, `doudoc.autoSave`
+- [x] Documentation, versionning, création du nouveau package et xacp
+- [ ] Amélioration design graphique de toute l'app par expert UI/UX et frontend avoir d'avoir quelque chose de moderne, beau et épuré, refonte entière s'il le faut s'il le faut
+- [ ] Documentation, versionning, création du nouveau package et xacp
 
 ## Questions à trancher
 

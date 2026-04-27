@@ -4,7 +4,7 @@ Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/do
 
 - a compact `WebviewView` in the activity bar;
 - a main `WebviewPanel` for reading;
-- global search on title + content;
+- global search on title + content (with fuzzy typo tolerance);
 - in-page search with highlighting;
 - a clickable table of contents;
 - Mermaid diagram rendering in fenced code blocks;
@@ -12,14 +12,28 @@ Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/do
 - support for Markdown relative links and local images;
 - back / forward navigation history (`Alt+←` / `Alt+→`);
 - quick-open palette (`Ctrl/Cmd+K`) to jump to any page by title;
+- global VS Code quick-pick search (`Ctrl/Cmd+Alt+P`);
 - reading progress bar and estimated reading time;
-- in-place WYSIWYG editing with paste-image, conflict detection, autosave-friendly toolbar.
+- last-modified date (from `git log` when available);
+- YAML front matter (`title`, `description`, `date`, `tags`) with rendered header;
+- in-place WYSIWYG editing with paste-image, conflict detection, **auto-save**;
+- create a new page from the UI (toolbar `+` button or command palette);
+- **zen mode** to hide sidebar and TOC for distraction-free reading;
+- **export to PDF** via the native print dialog;
+- multi-root workspace support — every workspace folder is scanned.
 
 ## Configuration
 
 | Setting | Default | Description |
 |---|---|---|
-| `doudoc.docsPaths` | `["docs"]` | Array of folder paths (relative to the workspace root) scanned by Doudoc as documentation sources. Configure several to expose multiple knowledge bases. |
+| `doudoc.docsPaths` | `["docs"]` | Folder paths (relative to each workspace root) scanned as documentation sources. |
+| `doudoc.defaultTheme` | `auto` | Webview theme: `auto` (follows VS Code), `light`, or `dark`. |
+| `doudoc.readingWidth` | `comfortable` | Reading column width: `narrow`, `comfortable`, `wide`, `full`. |
+| `doudoc.zenMode` | `false` | Start with sidebar and TOC hidden. Toggle with `Doudoc: Toggle zen mode`. |
+| `doudoc.autoSave` | `false` | Save the current page automatically while editing. |
+| `doudoc.autoSaveDelay` | `2000` | Debounce delay (ms, 500–60000) before auto-save fires. |
+| `doudoc.useGitMTime` | `true` | Resolve last-modified date with `git log -1` when available; fallback to filesystem `mtime`. |
+| `doudoc.fuzzySearch` | `true` | Allow 1–2 character typos in search queries. |
 
 ## Open any Markdown file
 

@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.5.0
+
+### Front matter YAML
+
+- parser interne (sans dépendance externe) pour les blocs `---` en tête de fichier — supporte `title`, `description`, `date`, `tags` (inline `[a, b]`, block `- item`, ou liste `a, b, c`)
+- le `title` du front matter prend la priorité sur le premier `# H1` pour la navigation
+- nouvel en-tête `<header class="doc-header">` rendu au-dessus du contenu : date, description, badges de tags
+- l'extrait de contenu est tokenisé sans le bloc YAML (fidélité au markdown source préservée pour la sauvegarde)
+
+### Recherche
+
+- **fuzzy search** activable via `doudoc.fuzzySearch` (par défaut `true`) — tolérance de 1–2 fautes de frappe (Levenshtein avec early-termination) appliquée uniquement quand aucun match exact/préfixe/contient n'est trouvé
+- nouveau scoring pour les `tags` (haute priorité) et la `description` du front matter
+
+### Édition
+
+- **auto-save** activable via `doudoc.autoSave` + `doudoc.autoSaveDelay` (500 ms à 60 s, défaut 2000 ms) — sauvegarde silencieusement sans sortir du mode édition, avec indicateur "Auto-saving…" / "Auto-saved"
+
+### Création de page
+
+- nouvelle commande **`Doudoc: Create new page`** (icône `+` dans l'en-tête du panel et le titre de la sidebar) — prompts pour le titre + chemin relatif (slugifié), source documentaire si plusieurs configurées, scaffold avec front matter `title`/`date`/`tags`
+
+### Lecture
+
+- mode **zen** (`doudoc.zenMode`, bouton dans l'en-tête, commande `Doudoc: Toggle zen mode`) — masque la sidebar et la TOC pour une lecture plein cadre
+- **largeur de lecture** configurable (`doudoc.readingWidth` : `narrow` / `comfortable` / `wide` / `full`) — applique une `max-width` sur le contenu
+- **export PDF / impression** : nouveau bouton dans l'en-tête + commande `Doudoc: Export current page to PDF` (utilise la boîte d'impression native du webview, avec stylesheet `@media print` dédiée)
+- **date de dernière modification** affichée sous le titre, prioritise `git log -1` si dispo (setting `doudoc.useGitMTime`, défaut `true`), fallback `mtime` filesystem
+
+### Navigation rapide
+
+- nouvelle commande **`Doudoc: Search documentation…`** (raccourci `Ctrl+Alt+P` / `Cmd+Alt+P`) — quick-pick global avec aperçu et nombre de mots
+
+### Multi-root
+
+- la repository scanne maintenant **tous les workspace folders** combinés avec les `doudoc.docsPaths` configurés ; les sources sont préfixées par `<root>/<path>` quand plusieurs racines sont présentes
+- réindexation automatique sur `onDidChangeWorkspaceFolders`
+
+### Préférences UI
+
+- nouveau message `panel-state` enrichi de `preferences` (`readingWidth`, `zenMode`, `autoSave`, `autoSaveDelay`) — appliquées via `data-reading-width` / `data-zen` sur `<html>`
+- thème par défaut configurable (`doudoc.defaultTheme` : `auto` / `light` / `dark`, défaut `auto` = synchronisé avec VS Code)
+
 ## 2.4.0
 
 ### Sources et fichiers ad-hoc
