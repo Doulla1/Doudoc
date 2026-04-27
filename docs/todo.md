@@ -1,3 +1,21 @@
+# Todo — v3.1.0 : correctifs PDF / autosave / sidebar + tableaux
+
+**Début** : 2026-04-27 19:30
+**Fin** : 2026-04-27 19:35
+
+## Tâches
+
+- [x] Fix export PDF (génération HTML autonome + ouverture navigateur externe)
+- [x] Fix faux conflit autosave (`selfWriteMtimes` 5 ms / 2 s)
+- [x] Toggle sidebar désactive le zen-mode
+- [x] Bouton Table dans la toolbar d'édition (prompt cols/rows, insertion)
+- [x] Bouton Task list + sérialisation Markdown `[ ] / [x]`
+- [x] Mettre à jour les tests (28/28 verts)
+- [x] Mettre à jour la documentation (CHANGELOG)
+- [x] Bump version 3.1.0
+
+---
+
 # Todo — v3.0.0 Phase 16.D : Refonte du design
 
 **Début** : 2026-04-27 18:53

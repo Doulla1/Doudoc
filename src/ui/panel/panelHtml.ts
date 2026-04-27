@@ -73,12 +73,14 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
             <div class="edit-toolbar-group">
               <button class="edit-btn" data-cmd="ul" title="Bullet list">&bull; list</button>
               <button class="edit-btn" data-cmd="ol" title="Numbered list">1. list</button>
+              <button class="edit-btn" data-cmd="task" title="Task list">&#9744; task</button>
               <button class="edit-btn" data-cmd="hr" title="Horizontal rule">&mdash;</button>
             </div>
             <div class="edit-toolbar-sep"></div>
             <div class="edit-toolbar-group">
               <button class="edit-btn" data-cmd="link" title="Insert link">Link</button>
               <button class="edit-btn" data-cmd="image" title="Insert image">Img</button>
+              <button class="edit-btn" data-cmd="table" title="Insert table">Table</button>
             </div>
           </div>
           <div id="edit-conflict" class="edit-conflict" style="display:none">
@@ -730,12 +732,88 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         case 'blockquote': document.execCommand('formatBlock', false, 'blockquote'); break;
         case 'ul': document.execCommand('insertUnorderedList'); break;
         case 'ol': document.execCommand('insertOrderedList'); break;
+        case 'task': insertTaskList(); break;
         case 'hr': document.execCommand('insertHorizontalRule'); break;
         case 'code': wrapSelectionInline('code'); break;
         case 'codeblock': insertCodeBlock(); break;
         case 'link': promptInsertLink(); break;
         case 'image': promptInsertImage(); break;
+        case 'table': promptInsertTable(); break;
       }
+    }
+
+    function insertTaskList() {
+      const ul = document.createElement('ul');
+      ul.className = 'task-list';
+      const li = document.createElement('li');
+      li.className = 'task-list-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'task-list-checkbox';
+      cb.contentEditable = 'false';
+      li.appendChild(cb);
+      li.appendChild(document.createTextNode(' Task'));
+      ul.appendChild(li);
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(ul);
+        range.setStartAfter(ul);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+
+    function promptInsertTable() {
+      const sel = window.getSelection();
+      let savedRange = null;
+      if (sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
+      showInsertDialog('Insert table', [
+        { name: 'cols', label: 'Columns', placeholder: '3', value: '3' },
+        { name: 'rows', label: 'Rows (excluding header)', placeholder: '2', value: '2' },
+      ]).then(function(data) {
+        if (!data) return;
+        const cols = Math.max(1, Math.min(12, parseInt(data.cols, 10) || 3));
+        const rows = Math.max(1, Math.min(50, parseInt(data.rows, 10) || 2));
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        for (let c = 0; c < cols; c++) {
+          const th = document.createElement('th');
+          th.textContent = 'Header ' + (c + 1);
+          headRow.appendChild(th);
+        }
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        for (let r = 0; r < rows; r++) {
+          const tr = document.createElement('tr');
+          for (let c = 0; c < cols; c++) {
+            const td = document.createElement('td');
+            td.textContent = 'Cell';
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        if (savedRange) {
+          const s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(savedRange);
+          savedRange.deleteContents();
+          savedRange.insertNode(table);
+          // Place caret in first header cell.
+          const firstTh = table.querySelector('th');
+          if (firstTh) {
+            const r = document.createRange();
+            r.selectNodeContents(firstTh);
+            s.removeAllRanges();
+            s.addRange(r);
+          }
+        }
+      });
     }
 
     function wrapSelectionInline(tag) {
@@ -1038,8 +1116,15 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         if (li.tagName.toLowerCase() !== 'li') continue;
         const clone = li.cloneNode(true);
         clone.querySelectorAll('ul, ol').forEach(function(l) { l.remove(); });
+        let prefix = '';
+        if (li.classList.contains('task-list-item')) {
+          const cb = clone.querySelector('input[type="checkbox"]');
+          const checked = cb && (cb.checked || cb.getAttribute('checked') !== null);
+          prefix = checked ? '[x] ' : '[ ] ';
+          if (cb) cb.remove();
+        }
         const text = inlineContent(clone).trim();
-        md += marker + ' ' + text + '\\n';
+        md += marker + ' ' + prefix + text + '\\n';
         const nestedUl = li.querySelector(':scope > ul');
         const nestedOl = li.querySelector(':scope > ol');
         if (nestedUl) {
@@ -1199,6 +1284,10 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     });
 
     sidebarToggleEl.addEventListener('click', () => {
+      // If user reveals the sidebar while in zen mode, exit zen so the sidebar is actually visible.
+      if (!isSidebarOpen && preferences.zenMode) {
+        vscode.postMessage({ type: 'panel-toggle-zen' });
+      }
       isSidebarOpen = !isSidebarOpen;
       renderSidebarToggle();
       persistViewState();
@@ -1230,7 +1319,7 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
     if (printPageEl) {
       printPageEl.addEventListener('click', () => {
-        try { window.print(); } catch (e) { /* noop */ }
+        vscode.postMessage({ type: 'panel-export-pdf' });
       });
     }
 

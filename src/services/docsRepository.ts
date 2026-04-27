@@ -233,6 +233,20 @@ export class DocsRepository {
   }
 
   getPage(relativePath: string, webview: vscode.Webview): RenderedDocPage | null {
+    return this.renderPageInternal(
+      relativePath,
+      (absolutePath) => webview.asWebviewUri(vscode.Uri.file(absolutePath)).toString(),
+    );
+  }
+
+  getPageForPrint(relativePath: string): RenderedDocPage | null {
+    return this.renderPageInternal(
+      relativePath,
+      (absolutePath) => vscode.Uri.file(absolutePath).toString(),
+    );
+  }
+
+  private renderPageInternal(relativePath: string, resolveAssetHref: (absolutePath: string) => string): RenderedDocPage | null {
     const page = this.snapshot.pages.find((candidate) => candidate.relativePath === relativePath);
 
     if (!page) {
@@ -249,7 +263,7 @@ export class DocsRepository {
         }
         return path.relative(page.sourceRoot, absolutePath).split(path.sep).join('/');
       },
-      resolveAssetHref: (absolutePath) => webview.asWebviewUri(vscode.Uri.file(absolutePath)).toString(),
+      resolveAssetHref,
       pathExists: (absolutePath) => syncFs.existsSync(absolutePath),
     });
 

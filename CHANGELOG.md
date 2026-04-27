@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.1.0
+
+### Correctifs
+
+- **Auto-save sans faux conflit** : la sauvegarde automatique ne déclenche plus systématiquement le bandeau « Conflict: This file was modified externally ». Le watcher reconnaît désormais les écritures issues de l'extension elle-même (mtime suivi avec tolérance de 5 ms et TTL de 2 s) et ne signale un conflit que pour les modifications externes réelles.
+- **Export PDF fiable** : la commande `Doudoc: Export current page (PDF)` (et le bouton imprimante) génère désormais un fichier HTML autonome (avec styles inline et auto-`window.print()`) ouvert dans le navigateur par défaut via `vscode.env.openExternal`. L'utilisateur dispose ainsi du dialogue d'impression natif et de « Save as PDF » sans dépendre du `window.print()` du webview VS Code, qui ne déclenchait rien.
+- **Toggle sidebar = sortie de zen** : ouvrir la sidebar via le bouton du header désactive automatiquement le mode zen, ce qui évite de cliquer sans effet visible.
+
+### Éditeur enrichi (tableaux, tâches)
+
+- Nouveau bouton **Table** dans la toolbar d'édition : prompt rapide (colonnes / lignes), insertion d'un tableau pré-rempli, curseur placé dans la première cellule d'en-tête.
+- Nouveau bouton **Task** : insertion de listes de tâches `[ ] / [x]` rondes, sérialisées en GFM lors de la sauvegarde.
+- Sérialisation Markdown des `task-list-item` (cases cochées préservées).
+- La sortie Markdown des tableaux respecte l'alignement (`text-align`) défini sur les en-têtes.
+
 ## 3.0.1
 
 ### Correctifs barre supérieure

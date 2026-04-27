@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { DocsRepository } from '@services/docsRepository';
 import { ExplorerViewProvider } from '@ui/view/ExplorerViewProvider';
 import { DocsPanel } from '@ui/panel/DocsPanel';
@@ -28,6 +29,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let panelQuery = '';
   let isEditing = false;
   let editTimestamp: number | null = null;
+  const selfWriteMtimes = new Map<string, number>();
   let zenMode = context.globalState.get<boolean>('doudoc.zenMode') ?? config.zenMode;
   const watcherDisposables: vscode.Disposable[] = [];
 
@@ -157,12 +159,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (panel) await publishPanelState(panel);
     }),
     vscode.commands.registerCommand('doudoc.exportPagePdf', async () => {
-      const panel = DocsPanel.getCurrent();
-      if (!panel) {
-        await vscode.window.showInformationMessage('Doudoc: open the documentation panel first.');
+      if (!selectedPath) {
+        await vscode.window.showInformationMessage('Doudoc: open a page first.');
         return;
       }
-      await panel.postMessage({ type: 'panel-trigger-print' });
+      try {
+        const page = repository.getPageForPrint(selectedPath);
+        if (!page) {
+          await vscode.window.showWarningMessage('Doudoc: page not found.');
+          return;
+        }
+        const html = renderStandalonePrintDocument(page);
+        const tmpDir = path.join(os.tmpdir(), 'doudoc-print');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const safeName = (selectedPath.replace(/[^a-z0-9-_]+/gi, '-') || 'page') + '-' + Date.now() + '.html';
+        const tmpFile = path.join(tmpDir, safeName);
+        await fs.writeFile(tmpFile, html, 'utf8');
+        await vscode.env.openExternal(vscode.Uri.file(tmpFile));
+        await vscode.window.showInformationMessage('Doudoc: page opened in your browser. Use Print → Save as PDF.');
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        await vscode.window.showErrorMessage(`Doudoc: PDF export failed (${reason})`);
+      }
     }),
   );
 
@@ -203,6 +221,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (kind === 'change' && uri && isEditing && selectedPath) {
       const editingPage = repository.getSnapshot().pages.find((page) => page.relativePath === selectedPath);
       if (editingPage && path.normalize(uri.fsPath) === editingPage.absolutePath) {
+        const fsPath = path.normalize(uri.fsPath);
+        const expected = selfWriteMtimes.get(fsPath);
+        let currentMtime: number | null = null;
+        try { currentMtime = require('node:fs').statSync(fsPath).mtimeMs as number; } catch { /* ignore */ }
+        if (expected !== undefined && currentMtime !== null && Math.abs(currentMtime - expected) < 5) {
+          // Our own write — accept silently.
+          editTimestamp = currentMtime;
+          return;
+        }
         const panel = DocsPanel.getCurrent();
         if (panel) {
           await panel.postMessage({ type: 'panel-edit-conflict' });
@@ -348,7 +375,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
         return;
       case 'panel-export-pdf':
-        // Webview prints itself; nothing else to do here.
+        await vscode.commands.executeCommand('doudoc.exportPagePdf');
         return;
       case 'panel-create-page':
         await createNewPage();
@@ -369,9 +396,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const savePanel = DocsPanel.getCurrent();
         try {
           await repository.savePage(selectedPath, typedMessage.markdown);
+          // Record the mtime we just wrote to suppress conflict notifications from our own watcher.
+          const justWrittenMtime = repository.getPageTimestamp(selectedPath);
+          const savedPage = repository.getSnapshot().pages.find((p) => p.relativePath === selectedPath);
+          if (justWrittenMtime !== null && savedPage) {
+            selfWriteMtimes.set(savedPage.absolutePath, justWrittenMtime);
+            // Clear after 2s — by then the watcher will have fired or the file will have changed externally.
+            setTimeout(() => {
+              if (selfWriteMtimes.get(savedPage.absolutePath) === justWrittenMtime) {
+                selfWriteMtimes.delete(savedPage.absolutePath);
+              }
+            }, 2000);
+          }
           if (!isAutoSave) {
             isEditing = false;
             editTimestamp = null;
+          } else if (justWrittenMtime !== null) {
+            editTimestamp = justWrittenMtime;
           }
           await repository.refresh();
           if (savePanel) {
@@ -581,4 +622,64 @@ function slugify(input: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || 'page';
+}
+
+function escapeHtmlAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderStandalonePrintDocument(page: { label: string; html: string; frontMatter?: { description?: string; date?: string; tags?: string[] } | null }): string {
+  const fm = page.frontMatter;
+  const tagsHtml = fm?.tags && fm.tags.length
+    ? '<div class="doc-tags">' + fm.tags.map((tag) => `<span class="doc-tag">${escapeHtmlAttr(tag)}</span>`).join('') + '</div>'
+    : '';
+  const descHtml = fm?.description ? `<p class="doc-description">${escapeHtmlAttr(fm.description)}</p>` : '';
+  const dateHtml = fm?.date ? `<div class="doc-date">${escapeHtmlAttr(fm.date)}</div>` : '';
+  const headerHtml = (dateHtml || descHtml || tagsHtml)
+    ? `<header class="doc-header">${dateHtml}${descHtml}${tagsHtml}</header>`
+    : '';
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtmlAttr(page.label)}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 780px; margin: 32px auto; padding: 0 24px 64px; line-height: 1.65; color: #0f172a; }
+  h1 { font-size: 2.05em; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; }
+  h2 { font-size: 1.5em; font-weight: 650; letter-spacing: -0.015em; padding-bottom: 0.3em; border-bottom: 1px solid rgba(15,23,42,0.08); margin-top: 1.8em; }
+  h3 { font-size: 1.2em; font-weight: 650; margin-top: 1.6em; }
+  p { margin: 0.85em 0; }
+  a { color: #2563eb; text-decoration: underline; }
+  blockquote { margin: 1em 0; padding: 0.4em 1em; border-left: 3px solid #2563eb; background: rgba(37,99,235,0.08); border-radius: 0 8px 8px 0; }
+  pre { overflow: auto; padding: 16px 18px; border-radius: 8px; background: #f5f6f8; border: 1px solid rgba(15,23,42,0.08); font-size: 0.92em; font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  code { background: rgba(15,23,42,0.06); border-radius: 6px; padding: 0.12em 0.4em; font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  pre > code { background: transparent; padding: 0; }
+  table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  th, td { border: 1px solid rgba(15,23,42,0.12); padding: 6px 10px; text-align: left; }
+  th { background: #f3f4f8; font-weight: 600; }
+  img { max-width: 100%; height: auto; }
+  hr { border: 0; border-top: 1px solid rgba(15,23,42,0.08); margin: 2em 0; }
+  .doc-header { margin: 0 0 24px; padding: 0 0 16px; border-bottom: 1px solid rgba(15,23,42,0.08); }
+  .doc-date { font-size: 12px; color: #475569; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 8px; }
+  .doc-description { font-size: 16px; color: #475569; line-height: 1.55; margin: 0 0 12px; }
+  .doc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .doc-tag { display: inline-flex; align-items: center; padding: 2px 9px; font-size: 12px; border-radius: 999px; background: #f3f4f8; color: #475569; border: 1px solid rgba(15,23,42,0.08); }
+  @media print {
+    body { margin: 0; padding: 16mm 18mm; max-width: none; }
+    h1, h2, h3 { page-break-after: avoid; }
+    pre, table, img { page-break-inside: avoid; }
+    a { color: #000; }
+  }
+</style>
+</head>
+<body>
+<article class="doc-article">
+${headerHtml}
+${page.html}
+</article>
+<script>window.addEventListener('load', () => { setTimeout(() => { try { window.print(); } catch (e) {} }, 250); });</script>
+</body>
+</html>`;
 }
