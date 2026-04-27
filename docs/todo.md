@@ -1,3 +1,21 @@
+# Todo — v3.0.0 Phase 16.D : Refonte du design
+
+**Début** : 2026-04-27 18:53
+**Fin** : 2026-04-27 18:57
+
+## Tâches
+
+- [x] Refonte des tokens de couleur (palette neutres + accents repensés)
+- [x] Typographie Inter / JetBrains Mono avec font-features
+- [x] En-tête neutre, focus ring accent, blur backdrop
+- [x] Liens, blockquote, code inline polish
+- [x] Sidebar tree : item actif `accent-soft`
+- [x] Tokens d'ombre / radius / état centralisés
+- [x] Mettre à jour la documentation (CHANGELOG, README, docs/todo.md)
+- [x] Bump version 3.0.0, commit + push
+
+---
+
 # Todo — v2.5.0 Phase 15 + Phase 16.A-C : Front matter, fuzzy, autosave, zen, PDF, multi-root, settings
 
 **Début** : 2026-04-27 18:39

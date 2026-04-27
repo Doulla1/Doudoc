@@ -163,8 +163,8 @@
 - [x] Documentation, versionning, création du nouveau package et xacp
 - [x] Settings : `doudoc.defaultTheme`, `doudoc.readingWidth`, `doudoc.autoSave`
 - [x] Documentation, versionning, création du nouveau package et xacp
-- [ ] Amélioration design graphique de toute l'app par expert UI/UX et frontend avoir d'avoir quelque chose de moderne, beau et épuré, refonte entière s'il le faut s'il le faut
-- [ ] Documentation, versionning, création du nouveau package et xacp
+- [x] Amélioration design graphique de toute l'app par expert UI/UX et frontend avoir d'avoir quelque chose de moderne, beau et épuré, refonte entière s'il le faut s'il le faut
+- [x] Documentation, versionning, création du nouveau package et xacp
 
 ## Questions à trancher
 

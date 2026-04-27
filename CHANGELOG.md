@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.0.0
+
+### Refonte du design (Phase 16.D)
+
+Redesign complet du système de design pour une apparence moderne, épurée et plus professionnelle.
+
+- **Palette retravaillée** : gris-bleu plus profonds en sombre (`#0b0f17` background), neutres plus doux en clair (`#fbfbfd`), accents `#6ea8fe` (sombre) / `#2563eb` (clair)
+- **Typographie** : Inter prioritaire, JetBrains Mono / Fira Code pour le code, font-feature-settings activés (chiffres tabulaires, ligatures de programmation), antialiasing optimisé
+- **Headings** : poids 700/650, letter-spacing serré, séparateur fin sous H2
+- **En-tête (toolbar) refait** : disparition du fond teal/bleu vif au profit d'une barre neutre alignée sur le thème, blur de fond, focus ring accent sur l'input de recherche
+- **Liens** : underline animée au hover
+- **Citations (`blockquote`)** : barre d'accent + fond teinté `accent-soft`
+- **Code inline** : nouveau token `--code-inline-bg` distinct du bloc, avec famille mono dédiée
+- **Sidebar tree** : item actif teinté `accent-soft` au lieu d'un highlight transparent ; transitions fluides hover/actif
+- **Tokens d'ombre** (`--shadow-sm/md/lg`) et de rayon (`--radius-sm/md/lg`) centralisés
+- **Tokens d'état** (`--success`, `--warning`, `--danger`) ajoutés pour les futures fonctionnalités
+- **Boutons d'en-tête** unifiés : nouvelles actions (créer, zen, imprimer) avec hover state cohérent
+
 ## 2.5.0
 
 ### Front matter YAML

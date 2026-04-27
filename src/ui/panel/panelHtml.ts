@@ -1369,9 +1369,10 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       gap: 16px;
       padding: 0 16px;
       background: var(--header-bg);
-      color: #ffffff;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
       height: 52px;
+      backdrop-filter: saturate(140%) blur(8px);
     }
     .header-brand {
       display: flex;
@@ -1382,27 +1383,35 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       flex-shrink: 0;
     }
     .header-search {
-      flex: 0 1 200px;
+      flex: 0 1 240px;
       min-width: 80px;
     }
     .header-search-input {
-      background: rgba(255,255,255,0.96);
-      border: none;
-      color: #172b4d;
+      background: var(--bg-muted);
+      border: 1px solid var(--border);
+      color: var(--text);
+      transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+    }
+    .header-search-input:focus {
+      border-color: var(--accent);
+      background: var(--bg-elevated);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+      outline: none;
     }
     .header-search-input::placeholder {
-      color: #6b778c;
+      color: var(--text-subtle);
     }
     .header-theme-toggle {
-      color: #ffffff;
+      color: var(--text-muted);
     }
     .header-sidebar-toggle {
-      color: #ffffff;
+      color: var(--text-muted);
       flex: none;
     }
     .header-sidebar-toggle:hover,
     .header-theme-toggle:hover {
-      background: rgba(255,255,255,0.16);
+      background: var(--bg-hover);
+      color: var(--text);
     }
     .shell-body {
       min-height: 0;
@@ -1577,22 +1586,51 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     .doc-article h4,
     .doc-article h5,
     .doc-article h6 {
-      line-height: 1.2;
+      line-height: 1.25;
       margin-top: 1.8em;
       scroll-margin-top: 88px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+    .doc-article h1 { font-size: 2.05em; letter-spacing: -0.02em; font-weight: 700; }
+    .doc-article h2 { font-size: 1.5em; letter-spacing: -0.015em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+    .doc-article h3 { font-size: 1.2em; }
+    .doc-article p { margin: 0.85em 0; }
+    .doc-article a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 120ms ease, color 120ms ease;
+    }
+    .doc-article a:hover { color: var(--accent-strong); border-bottom-color: currentColor; }
+    .doc-article blockquote {
+      margin: 1em 0;
+      padding: 0.4em 1em;
+      border-left: 3px solid var(--accent);
+      background: var(--accent-soft);
+      color: var(--text);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    }
+    .doc-article hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 2em 0;
     }
     .doc-article pre {
       overflow: auto;
-      padding: 14px;
-      border-radius: 8px;
+      padding: 16px 18px;
+      border-radius: var(--radius-md);
       background: var(--code-bg);
       border: 1px solid var(--border);
       margin: 0;
+      box-shadow: var(--shadow-sm);
     }
     .doc-article code {
-      background: var(--code-bg);
-      border-radius: 6px;
-      padding: 0.1em 0.35em;
+      background: var(--code-inline-bg);
+      border-radius: var(--radius-sm);
+      padding: 0.12em 0.4em;
+      font-size: 0.92em;
+      font-family: "JetBrains Mono", "Fira Code", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     }
     .doc-article pre > code {
       background: transparent;
@@ -2046,16 +2084,19 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       margin-right: 4px;
     }
     .header-history-btn {
-      color: #ffffff;
-      width: 26px;
-      height: 26px;
+      color: var(--text-muted);
+      width: 28px;
+      height: 28px;
       padding: 4px;
+      border-radius: var(--radius-sm);
+      transition: background 120ms ease, color 120ms ease;
     }
     .header-history-btn:hover:not(:disabled) {
-      background: rgba(255,255,255,0.16);
+      background: var(--bg-hover);
+      color: var(--text);
     }
     .header-history-btn:disabled {
-      opacity: 0.35;
+      opacity: 0.3;
       cursor: default;
     }
     .header-history-btn svg {
@@ -2063,12 +2104,23 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       height: 18px;
       fill: currentColor;
     }
-    .header-open-editor {
-      color: #ffffff;
+    .header-open-editor,
+    .header-create-page,
+    .header-zen-toggle,
+    .header-print {
+      color: var(--text-muted);
+      transition: background 120ms ease, color 120ms ease;
     }
-    .header-open-editor:hover {
-      background: rgba(255,255,255,0.16);
+    .header-open-editor:hover,
+    .header-create-page:hover,
+    .header-zen-toggle:hover,
+    .header-print:hover {
+      background: var(--bg-hover);
+      color: var(--text);
     }
+    .header-create-page svg,
+    .header-zen-toggle svg,
+    .header-print svg,
     .header-open-editor svg {
       width: 18px;
       height: 18px;
