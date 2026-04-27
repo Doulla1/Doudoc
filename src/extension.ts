@@ -217,7 +217,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           const absolutePath = path.join(assetsDir, fileName);
           await fs.writeFile(absolutePath, buffer);
 
-          const relativePath = `assets/${fileName}`;
+          // Compute relative path from the current page's directory so the
+          // markdown-it image resolver (which resolves relative to the page)
+          // can locate the asset regardless of how deep the page is.
+          let relativePath = `assets/${fileName}`;
+          if (selectedPath) {
+            const pageAbsoluteDir = path.dirname(path.join(docsRoot, selectedPath));
+            relativePath = path.relative(pageAbsoluteDir, absolutePath).split(path.sep).join('/');
+          }
           const assetUri = pastePanel.getWebview().asWebviewUri(vscode.Uri.file(absolutePath)).toString();
           await pastePanel.postMessage({ type: 'panel-paste-image-result', success: true, relativePath, assetUri });
         } catch (error) {
