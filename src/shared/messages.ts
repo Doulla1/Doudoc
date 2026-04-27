@@ -27,7 +27,6 @@ export type PanelToHostMessage =
   | { type: 'panel-paste-image'; dataUrl: string }
   | { type: 'panel-open-in-editor'; relativePath: string }
   | { type: 'panel-toggle-zen' }
-  | { type: 'panel-export-pdf' }
   | { type: 'panel-create-page' };
 
 export type HostToExplorerMessage =
@@ -79,7 +78,4 @@ export type HostToPanelMessage =
     relativePath?: string;
     assetUri?: string;
     error?: string;
-  }
-  | {
-    type: 'panel-trigger-print';
   };

@@ -28,7 +28,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         <div class="header-actions">
           <button class="icon-button is-plain header-create-page" id="create-page" type="button" aria-label="Create new page" title="New page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg></button>
           <button class="icon-button is-plain header-zen-toggle" id="zen-toggle" type="button" aria-label="Toggle zen mode" title="Toggle zen mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 0h2v5h-5v-2h3v-3z"/></svg></button>
-          <button class="icon-button is-plain header-print" id="print-page" type="button" aria-label="Print / Export PDF" title="Print / Export PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5a3 3 0 0 0-3 3v6h4v4h12v-4h4v-6a3 3 0 0 0-3-3zM8 19v-5h8v5H8zm11-7a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM18 3H6v4h12V3z"/></svg></button>
           <button class="icon-button is-plain header-open-editor" id="open-in-editor" type="button" aria-label="Open in VS Code editor" title="Open source in editor" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
           <button class="icon-button is-plain header-edit-toggle" id="edit-toggle" type="button" aria-label="Edit page" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.548 20.938h16.9a.75.75 0 0 1 0 1.5H3.548a.75.75 0 0 1 0-1.5ZM18.205 2.295a2.423 2.423 0 0 1 3.426 3.426l-1.38 1.38-3.427-3.426 1.38-1.38Zm-2.44 2.44 3.427 3.427L8.52 18.834a.75.75 0 0 1-.349.197l-4.5 1.273a.75.75 0 0 1-.926-.926l1.273-4.5a.75.75 0 0 1 .197-.349L14.765 4.735Z"/></svg></button>
           <button class="icon-button is-plain header-theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
@@ -141,7 +140,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const openInEditorEl = document.getElementById('open-in-editor');
     const createPageEl = document.getElementById('create-page');
     const zenToggleEl = document.getElementById('zen-toggle');
-    const printPageEl = document.getElementById('print-page');
     const brandSubtitleEl = document.getElementById('brand-subtitle');
     const readingProgressBarEl = document.getElementById('reading-progress-bar');
     const editToolbarEl = document.getElementById('edit-toolbar');
@@ -1317,11 +1315,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
         vscode.postMessage({ type: 'panel-toggle-zen' });
       });
     }
-    if (printPageEl) {
-      printPageEl.addEventListener('click', () => {
-        vscode.postMessage({ type: 'panel-export-pdf' });
-      });
-    }
 
     document.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -1403,11 +1396,6 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
 
       if (message.type === 'panel-edit-conflict') {
         editConflictEl.style.display = '';
-        return;
-      }
-
-      if (message.type === 'panel-trigger-print') {
-        try { window.print(); } catch (e) { /* noop */ }
         return;
       }
 
@@ -2221,21 +2209,18 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     }
     .header-open-editor,
     .header-create-page,
-    .header-zen-toggle,
-    .header-print {
+    .header-zen-toggle {
       color: var(--text-muted);
       transition: background 120ms ease, color 120ms ease;
     }
     .header-open-editor:hover,
     .header-create-page:hover,
-    .header-zen-toggle:hover,
-    .header-print:hover {
+    .header-zen-toggle:hover {
       background: var(--bg-hover);
       color: var(--text);
     }
     .header-create-page svg,
     .header-zen-toggle svg,
-    .header-print svg,
     .header-open-editor svg {
       width: 18px;
       height: 18px;

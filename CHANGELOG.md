@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.1.1
+
+### Retrait de l'export PDF
+
+- La fonctionnalité d'export PDF / impression est retirée. En remote (SSH, WSL, Dev Container), `vscode.env.openExternal` sur un fichier local du remote produit une URL `vscode-remote://...` que la machine locale ne sait pas ouvrir, et `window.print()` à l'intérieur du webview VS Code ne déclenche aucun dialogue d'impression. Les deux pistes ne donnent pas une expérience fiable cross-environnement.
+- Bouton imprimante du header retiré, commande `doudoc.exportPagePdf` retirée, code mort associé nettoyé.
+- Pour générer un PDF d'une page Doudoc, ouvrir le `.md` dans VS Code et utiliser une extension Markdown→PDF tierce, ou copier le rendu vers un éditeur externe.
+
 ## 3.1.0
 
 ### Correctifs

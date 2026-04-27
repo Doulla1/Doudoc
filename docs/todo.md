@@ -1,3 +1,18 @@
+# Todo — v3.1.1 : retrait export PDF
+
+**Début** : 2026-04-27 19:42
+**Fin** : 2026-04-27 19:46
+
+## Tâches
+
+- [x] Retrait commande `doudoc.exportPagePdf` (échec en remote SSH/WSL : `vscode-remote://` non ouvrable côté Windows)
+- [x] Retrait bouton imprimante du header
+- [x] Nettoyage messages `panel-export-pdf` / `panel-trigger-print`, helper `renderStandalonePrintDocument`, `getPageForPrint`
+- [x] Tests verts (28/28)
+- [x] CHANGELOG + bump 3.1.1
+
+---
+
 # Todo — v3.1.0 : correctifs PDF / autosave / sidebar + tableaux
 
 **Début** : 2026-04-27 19:30

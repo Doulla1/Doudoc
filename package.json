@@ -2,7 +2,7 @@
   "name": "doudoc",
   "displayName": "Doudoc",
   "description": "Workspace documentation explorer and reader for /docs",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "publisher": "Doudou",
   "license": "MIT",
   "repository": {
@@ -45,8 +45,7 @@
     "onCommand:doudoc.openMarkdownFile",
     "onCommand:doudoc.searchDocs",
     "onCommand:doudoc.createPage",
-    "onCommand:doudoc.toggleZenMode",
-    "onCommand:doudoc.exportPagePdf"
+    "onCommand:doudoc.toggleZenMode"
   ],
   "main": "./dist/extension.js",
   "icon": "media/logo.png",
@@ -144,11 +143,6 @@
         "command": "doudoc.toggleZenMode",
         "title": "Doudoc: Toggle Zen Mode",
         "icon": "$(screen-full)"
-      },
-      {
-        "command": "doudoc.exportPagePdf",
-        "title": "Doudoc: Export Current Page (PDF / Print)",
-        "icon": "$(file-pdf)"
       }
     ],
     "viewsContainers": {

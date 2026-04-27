@@ -239,13 +239,6 @@ export class DocsRepository {
     );
   }
 
-  getPageForPrint(relativePath: string): RenderedDocPage | null {
-    return this.renderPageInternal(
-      relativePath,
-      (absolutePath) => vscode.Uri.file(absolutePath).toString(),
-    );
-  }
-
   private renderPageInternal(relativePath: string, resolveAssetHref: (absolutePath: string) => string): RenderedDocPage | null {
     const page = this.snapshot.pages.find((candidate) => candidate.relativePath === relativePath);
 
