@@ -1,5 +1,33 @@
 # Todo - Extension VS Code Doudoc
 
+---
+
+# Todo - Sidebar full-width + Mermaid zoom + Téléchargement
+
+**Début** : 2026-05-14 13:43
+**Fin** : 2026-05-14 13:56
+
+## Tâches
+
+### Phase 1 — Contenu pleine largeur quand sidebars cachées
+- [x] Ajouter règles CSS dans `panelHtml.ts` : supprimer `max-width` de `.doc-article` quand `.is-sidebar-collapsed` ou `.is-toc-collapsed` est actif sur `.shell-body`
+
+### Phase 2 — Zoom interactif sur les diagrammes Mermaid
+- [x] Ajouter CSS pour `.mermaid-zoom-bar` et le wrapper de zoom dans `panelHtml.ts`
+- [x] Ajouter JS post-rendu dans `panelHtml.ts` : wrapper zoom, boutons +/−/reset, wheel event, redimensionnement SVG par `style.width/height`
+
+### Phase 3 — Téléchargement PDF et HTML
+- [x] Ajouter boutons PDF et HTML dans la toolbar du panel (`panelHtml.ts`)
+- [x] PDF : appel direct à `window.print()` (le `@media print` CSS est déjà complet)
+- [x] Ajouter `| { type: 'panel-download-html' }` dans `PanelToHostMessage` (`messages.ts`)
+- [x] Ajouter `case 'panel-download-html'` dans `handleMessage()` (`extension.ts`) : lire le markdown, render HTML, `showSaveDialog`, `writeFile`
+
+### Finalisation
+- [x] `npm run build` — zéro erreur TypeScript
+- [x] `npm test` — tous les tests existants passent
+
+---
+
 ## Phase 1 - Cadrage
 
 - [x] Inspecter le workspace existant

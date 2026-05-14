@@ -31,6 +31,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
           <button class="icon-button is-plain header-zen-toggle" id="zen-toggle" type="button" aria-label="Toggle zen mode" title="Toggle zen mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h5v2H7v3H5V5zm9 0h5v5h-2V7h-3V5zM5 14h2v3h3v2H5v-5zm12 0h2v5h-5v-2h3v-3z"/></svg></button>
           <button class="icon-button is-plain header-open-editor" id="open-in-editor" type="button" aria-label="Open in VS Code editor" title="Open source in editor" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3zM19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2z"/></svg></button>
           <button class="icon-button is-plain header-edit-toggle" id="edit-toggle" type="button" aria-label="Edit page" style="display:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.548 20.938h16.9a.75.75 0 0 1 0 1.5H3.548a.75.75 0 0 1 0-1.5ZM18.205 2.295a2.423 2.423 0 0 1 3.426 3.426l-1.38 1.38-3.427-3.426 1.38-1.38Zm-2.44 2.44 3.427 3.427L8.52 18.834a.75.75 0 0 1-.349.197l-4.5 1.273a.75.75 0 0 1-.926-.926l1.273-4.5a.75.75 0 0 1 .197-.349L14.765 4.735Z"/></svg></button>
+          <button class="icon-button is-plain header-download-pdf" id="download-pdf" type="button" aria-label="Print / Save as PDF" title="Print / Save as PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button>
+          <button class="icon-button is-plain header-download-html" id="download-html" type="button" aria-label="Export as HTML" title="Export as HTML"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
           <button class="icon-button is-plain header-theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme"></button>
         </div>
       </header>
@@ -143,6 +145,8 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     const openInEditorEl = document.getElementById('open-in-editor');
     const createPageEl = document.getElementById('create-page');
     const zenToggleEl = document.getElementById('zen-toggle');
+    const downloadPdfEl = document.getElementById('download-pdf');
+    const downloadHtmlEl = document.getElementById('download-html');
     const brandSubtitleEl = document.getElementById('brand-subtitle');
     const readingProgressBarEl = document.getElementById('reading-progress-bar');
     const editToolbarEl = document.getElementById('edit-toolbar');
@@ -199,9 +203,76 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       if (!nodes.length) return;
       try {
         await mermaid.run({ nodes: Array.from(nodes) });
+        initMermaidZoom();
       } catch (e) {
         console.warn('Mermaid render error:', e);
       }
+    }
+
+    function initMermaidZoom() {
+      contentEl.querySelectorAll('.mermaid-block').forEach((block) => {
+        if (block.dataset.zoomInit) return;
+        const svg = block.querySelector('svg');
+        if (!svg) return;
+        block.dataset.zoomInit = '1';
+
+        // Capture mermaid's own inline max-width (e.g. '481px') to restore on reset
+        const originalMaxWidth = svg.style.maxWidth;
+        // Natural width: prefer mermaid's own value, fall back to viewBox, then BCR
+        const mermaidW = parseFloat(originalMaxWidth);
+        const viewBox = svg.getAttribute('viewBox');
+        const vbParts = viewBox ? viewBox.trim().split(/[\s,]+/).map(Number) : null;
+        const naturalW = mermaidW > 0
+          ? mermaidW
+          : (vbParts && vbParts.length >= 4 ? vbParts[2] : svg.getBoundingClientRect().width || 400);
+        const naturalH = vbParts && vbParts.length >= 4
+          ? naturalW * (vbParts[3] / vbParts[2])
+          : svg.getBoundingClientRect().height || 200;
+
+        let zoom = 1.0;
+
+        const bar = document.createElement('div');
+        bar.className = 'mermaid-zoom-bar';
+        bar.innerHTML =
+          '<button class="mermaid-zoom-btn" data-action="out" title="Zoom arriere">\u2212</button>' +
+          '<span class="mermaid-zoom-level">100%</span>' +
+          '<button class="mermaid-zoom-btn" data-action="in" title="Zoom avant">+</button>' +
+          '<button class="mermaid-zoom-btn mermaid-zoom-reset" data-action="reset" title="Reinitialiser">\u21ba</button>';
+        block.insertBefore(bar, block.firstChild);
+        const levelEl = bar.querySelector('.mermaid-zoom-level');
+
+        function applyZoom(newZoom) {
+          zoom = Math.min(5, Math.max(0.2, Math.round(newZoom * 10) / 10));
+          levelEl.textContent = Math.round(zoom * 100) + '%';
+          if (zoom === 1) {
+            svg.style.width = '';
+            svg.style.height = '';
+            svg.style.maxWidth = originalMaxWidth;
+            block.classList.remove('is-zoomed');
+          } else {
+            svg.style.width = naturalW * zoom + 'px';
+            svg.style.height = naturalH * zoom + 'px';
+            svg.style.maxWidth = 'none';
+            block.classList.add('is-zoomed');
+          }
+        }
+
+        bar.addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-action]');
+          if (!btn) return;
+          const action = btn.dataset.action;
+          if (action === 'in') applyZoom(zoom + 0.25);
+          else if (action === 'out') applyZoom(zoom - 0.25);
+          else if (action === 'reset') applyZoom(1.0);
+        });
+
+        // Ctrl/Cmd + wheel to zoom without interfering with normal scroll
+        block.addEventListener('wheel', (e) => {
+          if (!(e.ctrlKey || e.metaKey)) return;
+          e.preventDefault();
+          applyZoom(zoom + (e.deltaY < 0 ? 0.1 : -0.1));
+        }, { passive: false });
+      });
     }
 
     function escapeHtml(value) {
@@ -1552,6 +1623,18 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       });
     }
 
+    if (downloadPdfEl) {
+      downloadPdfEl.addEventListener('click', () => {
+        window.print();
+      });
+    }
+
+    if (downloadHtmlEl) {
+      downloadHtmlEl.addEventListener('click', () => {
+        vscode.postMessage({ type: 'panel-download-html' });
+      });
+    }
+
     document.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -2177,6 +2260,49 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
       padding: 14px;
       text-align: center;
     }
+    .mermaid-zoom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      padding: 4px 8px;
+      margin: -14px -14px 12px;
+      border-bottom: 1px solid var(--border);
+      border-radius: 8px 8px 0 0;
+      background: var(--bg);
+    }
+    .mermaid-zoom-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      cursor: pointer;
+      line-height: 1;
+      transition: background 100ms ease, color 100ms ease;
+    }
+    .mermaid-zoom-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+    .mermaid-zoom-reset { font-size: 12px; }
+    .mermaid-zoom-level {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      min-width: 36px;
+      text-align: center;
+      user-select: none;
+      letter-spacing: 0.02em;
+    }
+    .mermaid-block.is-zoomed svg { max-width: none; }
     .mermaid-block pre.mermaid {
       background: transparent;
       border: none;
@@ -2498,21 +2624,27 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     .header-open-editor,
     .header-create-page,
     .header-zen-toggle,
-    .header-toc-toggle {
+    .header-toc-toggle,
+    .header-download-pdf,
+    .header-download-html {
       color: var(--text-muted);
       transition: background 120ms ease, color 120ms ease;
     }
     .header-open-editor:hover,
     .header-create-page:hover,
     .header-zen-toggle:hover,
-    .header-toc-toggle:hover {
+    .header-toc-toggle:hover,
+    .header-download-pdf:hover,
+    .header-download-html:hover {
       background: var(--bg-hover);
       color: var(--text);
     }
     .header-create-page svg,
     .header-zen-toggle svg,
     .header-open-editor svg,
-    .header-toc-toggle svg {
+    .header-toc-toggle svg,
+    .header-download-pdf svg,
+    .header-download-html svg {
       width: 18px;
       height: 18px;
       fill: currentColor;
@@ -2572,6 +2704,12 @@ export function getPanelHtml(theme: ThemeMode, cspSource: string): string {
     :root[data-reading-width="comfortable"] .doc-article { max-width: 760px; margin: 0 auto; }
     :root[data-reading-width="wide"] .doc-article { max-width: 960px; margin: 0 auto; }
     :root[data-reading-width="full"] .doc-article { max-width: none; }
+    /* When one or both sidebars are hidden, the article fills the full available column */
+    .shell-body.is-sidebar-collapsed .doc-article,
+    .shell-body.is-toc-collapsed .doc-article {
+      max-width: none !important;
+      margin: 0 !important;
+    }
     /* Zen mode: hide sidebar, hide TOC, center content */
     :root[data-zen="on"] .sidebar { display: none; }
     :root[data-zen="on"] .toc { display: none; }

@@ -6,6 +6,7 @@ import { ExplorerViewProvider } from '@ui/view/ExplorerViewProvider';
 import { DocsPanel } from '@ui/panel/DocsPanel';
 import type { ExplorerToHostMessage, PanelToHostMessage, PanelPreferences, ReadingWidth } from '@shared/messages';
 import type { ThemeMode } from '@shared/types';
+import { renderMarkdown } from '@core/markdown';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -450,6 +451,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(target.absolutePath));
         return;
       }
+      case 'panel-download-html': {
+        if (!selectedPath) return;
+        const pageRecord = repository.getSnapshot().pages.find((p) => p.relativePath === selectedPath);
+        if (!pageRecord) return;
+        const defaultName = pageRecord.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'document';
+        const saveUri = await vscode.window.showSaveDialog({
+          defaultUri: vscode.Uri.file(path.join(path.dirname(pageRecord.absolutePath), defaultName + '.html')),
+          filters: { 'HTML': ['html'] },
+          title: 'Export page as HTML',
+        });
+        if (!saveUri) return;
+        const rendered = renderMarkdown(pageRecord.rawMarkdown, {
+          currentAbsolutePath: pageRecord.absolutePath,
+          docsRoot: pageRecord.sourceRoot,
+          resolveDocumentHref: (absolutePath) => 'file://' + absolutePath,
+          resolveAssetHref: (absolutePath) => 'file://' + absolutePath,
+          pathExists: () => true,
+        });
+        const exportHtml = buildExportHtml(pageRecord.label, rendered.html);
+        await fs.writeFile(saveUri.fsPath, exportHtml, 'utf-8');
+        return;
+      }
       default:
         return;
     }
@@ -546,6 +569,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate(): void { }
+
+function buildExportHtml(title: string, bodyHtml: string): string {
+  const escaped = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escaped}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e; max-width: 860px; margin: 0 auto; padding: 32px 24px 80px; }
+    h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; margin-top: 0; }
+    h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    h3 { font-size: 1.25em; }
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: #f6f8fa; border-radius: 3px; padding: 0.2em 0.4em; font-size: 0.9em; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+    pre { background: #f6f8fa; border-radius: 6px; padding: 16px; overflow: auto; }
+    pre code { background: transparent; padding: 0; font-size: 12.5px; }
+    blockquote { border-left: 4px solid #dfe2e5; margin: 0 0 16px; padding: 0 1em; color: #6a737d; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+    th, td { border: 1px solid #dfe2e5; padding: 8px 12px; }
+    th { background: #f6f8fa; font-weight: 600; }
+    img { max-width: 100%; height: auto; }
+    hr { border: 0; border-top: 1px solid #eaecef; margin: 24px 0; }
+  </style>
+</head>
+<body>
+  <h1>${escaped}</h1>
+  ${bodyHtml}
+</body>
+</html>`;
+}
 
 interface DoudocSettings {
   docsPaths: string[];

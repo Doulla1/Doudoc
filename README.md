@@ -19,7 +19,9 @@ Doudoc is a VS Code extension that reads the documentation in `/<projectRoot>/do
 - in-place WYSIWYG editing with paste-image, conflict detection, **auto-save**;
 - create a new page from the UI (toolbar `+` button or command palette);
 - **zen mode** to hide sidebar and TOC for distraction-free reading;
-- **export to PDF** via the native print dialog;
+- **interactive Mermaid zoom** — +/−/reset controls on each diagram, plus Ctrl/Cmd+wheel; sidebars auto-expand the reading column when hidden;
+- **print / PDF** via the header printer button (`window.print()`, clean `@media print` stylesheet);
+- **HTML export** via the header download button — saves a standalone HTML file with inline styles;
 - multi-root workspace support — every workspace folder is scanned.
 
 ## Configuration

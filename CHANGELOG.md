@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.0
+
+### Pleine largeur, zoom Mermaid et export de page
+
+- **Contenu pleine largeur** : quand une ou les deux sidebars sont masquées (sidebar gauche ou TOC droite), l'article occupe automatiquement toute la largeur disponible — y compris les diagrammes Mermaid.
+- **Zoom interactif sur les diagrammes Mermaid** : chaque diagramme dispose d'une barre de contrôle (+, −, %, ↺) permettant d'agrandir ou réduire le SVG. Le scroll horizontal/vertical devient disponible dès que le diagramme dépasse le conteneur. Ctrl/Cmd+molette fonctionne également sur le diagramme survolé.
+- **Impression / PDF** : nouveau bouton imprimante dans le header — déclenche `window.print()`. La feuille de style `@media print` existante masque tout le chrome et n'imprime que l'article.
+- **Export HTML** : nouveau bouton téléchargement dans le header — ouvre une boîte de dialogue `showSaveDialog`, puis écrit un fichier HTML autonome (styles inline, images référencées en `file://`) exportable sur la machine locale.
+
 ## 3.3.0
 
 ### Toggle de la table des matières (TOC)

@@ -27,7 +27,8 @@ export type PanelToHostMessage =
   | { type: 'panel-paste-image'; dataUrl: string }
   | { type: 'panel-open-in-editor'; relativePath: string }
   | { type: 'panel-toggle-zen' }
-  | { type: 'panel-create-page' };
+  | { type: 'panel-create-page' }
+  | { type: 'panel-download-html' };
 
 export type HostToExplorerMessage =
   | {
